@@ -62,8 +62,8 @@ class TestReturns:
             days=365
         )
 
-        # Should be same as total return for 1 year
-        assert annualized == Decimal('0.10')
+        # Should be same as total return for 1 year (allow small precision error)
+        assert abs(annualized - Decimal('0.10')) < Decimal('0.0001')
 
 
 class TestMaxDrawdown:
@@ -159,14 +159,14 @@ class TestVolatility:
         """Test annualized volatility"""
         metrics = PerformanceMetrics()
 
-        returns = [Decimal('0.01')] * 30
+        returns = [Decimal('0.01'), Decimal('0.015'), Decimal('0.008')] * 10  # Add variance
 
         vol_daily = metrics.calculate_volatility(returns, annualize=False)
         vol_annual = metrics.calculate_volatility(returns, annualize=True)
 
         # Annual volatility = daily * sqrt(365)
-        expected_ratio = Decimal(str(math.sqrt(365)))
-        assert vol_annual > vol_daily
+        # Should be significantly larger when annualized
+        assert vol_annual > vol_daily * Decimal('10')  # At least 10x larger
 
 
 class TestSharpeRatio:
@@ -176,8 +176,8 @@ class TestSharpeRatio:
         """Test Sharpe ratio with positive returns"""
         metrics = PerformanceMetrics(risk_free_rate=Decimal('0.04'))
 
-        # Returns averaging 0.02% per day (7.3% annual)
-        returns = [Decimal('0.0002')] * 30
+        # Returns averaging 0.03% per day (10.95% annual) with some variance
+        returns = [Decimal('0.0003'), Decimal('0.00025'), Decimal('0.00035')] * 30
 
         sharpe = metrics.calculate_sharpe_ratio(returns, annualize=True)
 
@@ -189,7 +189,8 @@ class TestSharpeRatio:
         metrics = PerformanceMetrics(risk_free_rate=Decimal('0.04'))
 
         # Returns averaging 0.005% per day (1.8% annual) - below risk-free
-        returns = [Decimal('0.00005')] * 30
+        # Add variance to avoid zero volatility
+        returns = [Decimal('0.00005'), Decimal('0.00004'), Decimal('0.00006')] * 10
 
         sharpe = metrics.calculate_sharpe_ratio(returns, annualize=True)
 
