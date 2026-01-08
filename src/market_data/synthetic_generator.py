@@ -343,8 +343,8 @@ class SyntheticDataGenerator:
     def generate_multiple_assets(
         self,
         days: int = 180,
-        assets: List[str] = None,
-        market_regime: str = 'normal'
+        assets: Optional[List[str]] = None,
+        market_regime: Literal['normal', 'bull', 'bear', 'volatile'] = 'normal'
     ) -> Dict[str, List[MarketSnapshot]]:
         """
         Generate data for multiple assets

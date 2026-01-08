@@ -154,7 +154,7 @@ class TreasurySimulator:
         Returns:
             Total collateral amount
         """
-        return sum(pos.collateral_amount for pos in self.positions)
+        return sum((pos.collateral_amount for pos in self.positions), Decimal('0'))
 
     def get_total_debt(self) -> Decimal:
         """
@@ -163,7 +163,7 @@ class TreasurySimulator:
         Returns:
             Total debt amount
         """
-        return sum(pos.debt_amount for pos in self.positions)
+        return sum((pos.debt_amount for pos in self.positions), Decimal('0'))
 
     def get_net_value(self) -> Decimal:
         """

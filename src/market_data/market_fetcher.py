@@ -7,7 +7,7 @@ Fetches real market data from multiple sources:
 """
 
 import requests
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from decimal import Decimal
@@ -72,13 +72,13 @@ class MarketDataFetcher:
         age = time.time() - self._cache_timestamps[key]
         return age < self.cache_ttl
 
-    def _get_cached(self, key: str) -> Optional[any]:
+    def _get_cached(self, key: str) -> Optional[Any]:
         """Get cached data if valid"""
         if self._is_cache_valid(key):
             return self._cache.get(key)
         return None
 
-    def _set_cache(self, key: str, value: any):
+    def _set_cache(self, key: str, value: Any):
         """Set cached data"""
         self._cache[key] = value
         self._cache_timestamps[key] = time.time()
@@ -258,8 +258,8 @@ class MarketDataFetcher:
 
     def get_combined_data(
         self,
-        protocols: List[str] = None,
-        assets: List[str] = None
+        protocols: Optional[List[str]] = None,
+        assets: Optional[List[str]] = None
     ) -> Dict[str, Dict[str, MarketData]]:
         """
         Get data for multiple protocols and assets

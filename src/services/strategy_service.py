@@ -93,7 +93,7 @@ class StrategyService:
         if not strategy:
             return False
 
-        strategy.is_active = 0
+        strategy.is_active = 0  # type: ignore[assignment]
         db.commit()
         return True
 
@@ -104,7 +104,7 @@ class StrategyService:
         if not strategy:
             return False
 
-        strategy.is_active = 1
+        strategy.is_active = 1  # type: ignore[assignment]
         db.commit()
         return True
 

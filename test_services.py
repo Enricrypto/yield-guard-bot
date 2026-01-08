@@ -33,14 +33,14 @@ def test_services():
         print(f"   ✅ Created strategy: {strategy.name} (ID: {strategy.id})")
 
         # Test retrieve
-        retrieved = StrategyService.get_strategy_by_id(db, strategy.id)
-        print(f"   ✅ Retrieved strategy: {retrieved.name}")
+        retrieved = StrategyService.get_strategy_by_id(db, strategy.id)  # type: ignore[arg-type]
+        print(f"   ✅ Retrieved strategy: {retrieved.name}")  # type: ignore[union-attr]
 
         # Test 2: Simulation Service
         print("\n2. Testing SimulationService...")
         simulation = SimulationService.create_simulation(
             db=db,
-            strategy_id=strategy.id,
+            strategy_id=strategy.id,  # type: ignore[arg-type]
             start_date=datetime(2024, 1, 1),
             end_date=datetime(2024, 12, 31),
             initial_capital=50000.0
@@ -50,7 +50,7 @@ def test_services():
         # Update with results
         updated_sim = SimulationService.update_simulation_results(
             db=db,
-            simulation_id=simulation.id,
+            simulation_id=simulation.id,  # type: ignore[arg-type]
             final_value=62500.0,
             total_return=25.0,
             total_return_amount=12500.0,
@@ -60,8 +60,8 @@ def test_services():
             win_rate=72.0,
             execution_time=30.5
         )
-        print(f"   ✅ Updated simulation with results (Status: {updated_sim.status})")
-        print(f"      Return: {updated_sim.total_return}%, Sharpe: {updated_sim.sharpe_ratio}")
+        print(f"   ✅ Updated simulation with results (Status: {updated_sim.status})")  # type: ignore[union-attr]
+        print(f"      Return: {updated_sim.total_return}%, Sharpe: {updated_sim.sharpe_ratio}")  # type: ignore[union-attr]
 
         # Test 3: Portfolio Service
         print("\n3. Testing PortfolioService...")
@@ -76,7 +76,7 @@ def test_services():
 
             record = PortfolioService.create_portfolio_record(
                 db=db,
-                simulation_id=simulation.id,
+                simulation_id=simulation.id,  # type: ignore[arg-type]
                 date=date,
                 total_value=value,
                 cash_balance=value * 0.25,
@@ -92,11 +92,11 @@ def test_services():
         print(f"   ✅ Created 3 portfolio history records")
 
         # Get portfolio history
-        history = PortfolioService.get_portfolio_history(db, simulation.id)
+        history = PortfolioService.get_portfolio_history(db, simulation.id)  # type: ignore[arg-type]
         print(f"   ✅ Retrieved {len(history)} portfolio records")
 
         # Get stats
-        stats = PortfolioService.get_portfolio_stats(db, simulation.id)
+        stats = PortfolioService.get_portfolio_stats(db, simulation.id)  # type: ignore[arg-type]
         print(f"   ✅ Portfolio stats:")
         print(f"      Initial: ${stats['initial_value']:,.2f}")
         print(f"      Final: ${stats['final_value']:,.2f}")
@@ -107,10 +107,10 @@ def test_services():
         all_strategies = StrategyService.get_all_strategies(db)
         print(f"   ✅ Found {len(all_strategies)} active strategies")
 
-        sims_for_strategy = SimulationService.get_simulations_by_strategy(db, strategy.id)
+        sims_for_strategy = SimulationService.get_simulations_by_strategy(db, strategy.id)  # type: ignore[arg-type]
         print(f"   ✅ Found {len(sims_for_strategy)} simulations for strategy")
 
-        best_sim = SimulationService.get_best_simulation_for_strategy(db, strategy.id)
+        best_sim = SimulationService.get_best_simulation_for_strategy(db, strategy.id)  # type: ignore[arg-type]
         if best_sim:
             print(f"   ✅ Best simulation: {best_sim.total_return}% return")
 

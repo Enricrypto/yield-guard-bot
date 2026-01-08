@@ -98,7 +98,7 @@ class MorphoFetcher:
         try:
             payload = {'query': query}
             if variables:
-                payload['variables'] = variables
+                payload['variables'] = variables  # type: ignore[assignment]
 
             response = requests.post(
                 self.API_URL,

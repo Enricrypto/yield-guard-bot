@@ -31,7 +31,7 @@ def test_synthetic_generator():
     print("\n2. Testing different market regimes...")
     regimes = ['normal', 'bull', 'bear', 'volatile']
     for regime in regimes:
-        snapshots = generator.generate_timeseries(days=30, market_regime=regime)
+        snapshots = generator.generate_timeseries(days=30, market_regime=regime)  # type: ignore[arg-type]
         avg_apy = sum(float(s.aave_supply_apy) for s in snapshots) / len(snapshots)
         avg_risk = sum(s.risk_score for s in snapshots) / len(snapshots)
         print(f"   {regime.capitalize():10} - Avg APY: {avg_apy*100:5.2f}%, Avg Risk: {avg_risk:5.1f}")

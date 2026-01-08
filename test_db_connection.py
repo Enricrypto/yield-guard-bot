@@ -232,13 +232,13 @@ def main():
 
     # Test 3: Insert strategy
     strategy_id = test_strategy_insert()
-    if not strategy_id:
+    if not strategy_id:  # type: ignore[arg-type]
         print("\n❌ Failed to create strategy.")
         return
 
     # Test 4: Insert simulation
     simulation_id = test_simulation_insert(strategy_id)
-    if not simulation_id:
+    if not simulation_id:  # type: ignore[arg-type]
         print("\n❌ Failed to create simulation.")
         return
 

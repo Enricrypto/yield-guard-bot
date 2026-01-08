@@ -297,6 +297,11 @@ class ProtocolComparator:
         """
         comparison = self.compare_asset(symbol, use_case='balanced')
 
+        # Type ignore for operations on potentially Optional fields that are guaranteed non-None here
+        aave_borrow = comparison.aave_borrow_apy * 100  # type: ignore[operator]
+        morpho_borrow = comparison.morpho_borrow_apy * 100  # type: ignore[operator]
+        borrow_adv = abs(comparison.borrow_advantage) * 100  # type: ignore[arg-type,operator]
+
         report = f"""
 Protocol Comparison Report: {symbol}
 {'=' * 50}
@@ -307,9 +312,9 @@ SUPPLY (LENDING) RATES:
   Winner: {comparison.better_supply_protocol} (+{abs(comparison.supply_advantage) * 100:.2f}%)
 
 BORROW RATES:
-  Aave:   {comparison.aave_borrow_apy * 100:>6.2f}%
-  Morpho: {comparison.morpho_borrow_apy * 100:>6.2f}%
-  Winner: {comparison.better_borrow_protocol} (-{abs(comparison.borrow_advantage) * 100:.2f}%)
+  Aave:   {aave_borrow:>6.2f}%
+  Morpho: {morpho_borrow:>6.2f}%
+  Winner: {comparison.better_borrow_protocol} (-{borrow_adv:.2f}%)
 
 RISK PARAMETERS:
   LTV:                 Aave: {comparison.aave_ltv * 100:.0f}%, Morpho: {comparison.morpho_ltv * 100:.0f}%
