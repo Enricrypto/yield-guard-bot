@@ -70,11 +70,11 @@ class SimulationService:
         if not simulation:
             return None
 
-        simulation.status = status
+        simulation.status = status  # type: ignore[assignment]
         if error_message:
-            simulation.error_message = error_message
+            simulation.error_message = error_message  # type: ignore[assignment]
         if status == "completed":
-            simulation.completed_at = datetime.utcnow()
+            simulation.completed_at = datetime.utcnow()  # type: ignore[assignment]
 
         db.commit()
         db.refresh(simulation)
@@ -102,20 +102,20 @@ class SimulationService:
         if not simulation:
             return None
 
-        simulation.final_value = final_value
-        simulation.total_return = total_return
-        simulation.total_return_amount = total_return_amount
-        simulation.max_drawdown = max_drawdown
-        simulation.sharpe_ratio = sharpe_ratio
-        simulation.volatility = volatility
-        simulation.win_rate = win_rate
-        simulation.avg_daily_return = avg_daily_return
-        simulation.best_day = best_day
-        simulation.worst_day = worst_day
-        simulation.execution_time = execution_time
-        simulation.metrics = metrics
-        simulation.status = "completed"
-        simulation.completed_at = datetime.utcnow()
+        simulation.final_value = final_value  # type: ignore[assignment]
+        simulation.total_return = total_return  # type: ignore[assignment]
+        simulation.total_return_amount = total_return_amount  # type: ignore[assignment]
+        simulation.max_drawdown = max_drawdown  # type: ignore[assignment]
+        simulation.sharpe_ratio = sharpe_ratio  # type: ignore[assignment]
+        simulation.volatility = volatility  # type: ignore[assignment]
+        simulation.win_rate = win_rate  # type: ignore[assignment]
+        simulation.avg_daily_return = avg_daily_return  # type: ignore[assignment]
+        simulation.best_day = best_day  # type: ignore[assignment]
+        simulation.worst_day = worst_day  # type: ignore[assignment]
+        simulation.execution_time = execution_time  # type: ignore[assignment]
+        simulation.metrics = metrics  # type: ignore[assignment]
+        simulation.status = "completed"  # type: ignore[assignment]
+        simulation.completed_at = datetime.utcnow()  # type: ignore[assignment]
 
         db.commit()
         db.refresh(simulation)

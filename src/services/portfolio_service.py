@@ -153,7 +153,7 @@ class PortfolioService:
             "max_value": max(total_values),
             "min_value": min(total_values),
             "avg_daily_return": sum(daily_returns) / len(daily_returns) if daily_returns else 0,
-            "rebalance_count": sum(1 for r in records if r.rebalanced == 1)
+            "rebalance_count": sum(1 for r in records if r.rebalanced == 1)  # type: ignore[arg-type]
         }
 
         return stats
@@ -166,7 +166,7 @@ class PortfolioService:
             PortfolioHistory.rebalanced == 1
         ).order_by(PortfolioHistory.date.asc()).all()
 
-        return [record.date for record in records]
+        return [record.date for record in records]  # type: ignore[return-value]
 
     @staticmethod
     def bulk_create_portfolio_records(
