@@ -249,6 +249,21 @@ class Position:
         self.borrow_apy = borrow_apy
         self.last_updated = datetime.now()
 
+    def update_risk_parameters(self, ltv: Optional[Decimal] = None, liquidation_threshold: Optional[Decimal] = None):
+        """
+        Update risk parameters (LTV and/or liquidation threshold)
+        This reflects protocol governance changes over time
+
+        Args:
+            ltv: New LTV ratio (optional)
+            liquidation_threshold: New liquidation threshold (optional)
+        """
+        if ltv is not None:
+            self.ltv = ltv
+        if liquidation_threshold is not None:
+            self.liquidation_threshold = liquidation_threshold
+        self.last_updated = datetime.now()
+
     def get_net_apy(self) -> Decimal:
         """
         Calculate net APY considering both supply and borrow

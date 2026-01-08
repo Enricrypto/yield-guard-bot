@@ -233,22 +233,35 @@ class TreasurySimulator:
 
         Args:
             days: Number of days to simulate
-            market_data: Optional market data for updating rates
-                        Format: {protocol: {asset: {'supply_apy': X, 'borrow_apy': Y}}}
+            market_data: Optional market data for updating rates and risk parameters
+                        Format: {protocol: {asset: {
+                            'supply_apy': X,
+                            'borrow_apy': Y,
+                            'ltv': Z (optional),
+                            'liquidation_threshold': W (optional)
+                        }}}
 
         Returns:
             Portfolio snapshot after step
         """
-        # Update rates if market data provided
+        # Update rates and risk parameters if market data provided
         if market_data:
             for position in self.positions:
                 protocol_data = market_data.get(position.protocol, {})
                 asset_data = protocol_data.get(position.asset_symbol, {})
 
+                # Update interest rates
                 if 'supply_apy' in asset_data and 'borrow_apy' in asset_data:
                     position.update_rates(
                         supply_apy=asset_data['supply_apy'],
                         borrow_apy=asset_data['borrow_apy']
+                    )
+
+                # Update risk parameters if provided
+                if 'ltv' in asset_data or 'liquidation_threshold' in asset_data:
+                    position.update_risk_parameters(
+                        ltv=asset_data.get('ltv'),
+                        liquidation_threshold=asset_data.get('liquidation_threshold')
                     )
 
         # Accrue interest on all positions
