@@ -19,6 +19,7 @@ pluggy==1.6.0
 protobuf==6.33.2
 psycopg2-binary==2.9.11
 pyarrow==22.0.0
+python-dotenv==1.0.1
 pydeck==0.9.1
 Pygments==2.19.2
 pytest==9.0.2
