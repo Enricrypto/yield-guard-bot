@@ -19,6 +19,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 from src.market_data.historical_fetcher import HistoricalDataFetcher, HistoricalYield
+from src.market_data.risk_parameter_fetcher import get_risk_parameters_for_simulation
 from src.simulator.treasury_simulator import TreasurySimulator, PortfolioSnapshot
 from src.analytics.performance_metrics import PerformanceMetrics
 
@@ -138,6 +139,36 @@ def backtest_conservative_strategy(
 
     print(f"\n✓ Successfully fetched data for {len(protocols_data)} protocol(s)")
 
+    # Fetch historical risk parameters for Aave V3 (other protocols use defaults)
+    print("\nFetching historical risk parameters...")
+
+    # Calculate simulation start date from the first data point
+    start_date = datetime.now()  # Default to now
+    for data in protocols_data.values():
+        if data:
+            start_date = data[0].timestamp
+            break
+
+    # Get risk parameters for each protocol
+    risk_parameters_by_protocol = {}
+    for protocol in protocols_data.keys():
+        risk_params = get_risk_parameters_for_simulation(
+            protocol=protocol,
+            asset_symbol='USDC',
+            start_date=start_date,
+            days=days_back,
+            network='mainnet'
+        )
+        risk_parameters_by_protocol[protocol] = risk_params
+
+        # Show if parameters change during simulation
+        unique_params = set(risk_params.values())
+        if len(unique_params) > 1:
+            print(f"  {protocol}: Risk parameters change {len(unique_params) - 1} time(s)")
+        else:
+            ltv, liq_threshold = list(unique_params)[0]
+            print(f"  {protocol}: Static parameters (LTV={ltv*100:.1f}%, Threshold={liq_threshold*100:.1f}%)")
+
     print_section("STEP 2: Portfolio Construction")
 
     # Calculate allocation per protocol
@@ -164,17 +195,20 @@ def backtest_conservative_strategy(
         # Use first data point's APY as initial rate
         initial_apy = data[0].apy
 
+        # Get initial risk parameters for day 0
+        initial_ltv, initial_liq_threshold = risk_parameters_by_protocol[protocol][0]
+
         position = treasury.deposit(
             protocol=protocol,
             asset_symbol='USDC',
             amount=allocation_per_protocol,
             supply_apy=initial_apy,
             borrow_apy=Decimal('0'),  # No borrowing in conservative strategy
-            ltv=Decimal('0'),  # No leverage
-            liquidation_threshold=Decimal('0.85')
+            ltv=Decimal('0'),  # No leverage in conservative strategy
+            liquidation_threshold=initial_liq_threshold  # Use historical parameter
         )
 
-        print(f"  ✓ {protocol}: ${allocation_per_protocol:,.0f} at {initial_apy*100:.2f}% APY")
+        print(f"  ✓ {protocol}: ${allocation_per_protocol:,.0f} at {initial_apy*100:.2f}% APY (Liq Threshold: {initial_liq_threshold*100:.1f}%)")
 
     # Prepare market data for simulation
     # We need to align all protocols to the same timeline
@@ -182,17 +216,22 @@ def backtest_conservative_strategy(
 
     print(f"\nSimulating {min_length} days...")
 
-    # Create market data generator
+    # Create market data generator with dynamic risk parameters
     def market_data_generator(day_index: int) -> Dict:
-        """Generate market data for a specific day"""
+        """Generate market data for a specific day including dynamic risk parameters"""
         market_data = {}
 
         for protocol, data in protocols_data.items():
             if day_index < len(data):
+                # Get risk parameters for this day
+                ltv, liq_threshold = risk_parameters_by_protocol[protocol][day_index]
+
                 market_data[protocol] = {
                     'USDC': {
                         'supply_apy': data[day_index].apy,
-                        'borrow_apy': Decimal('0')  # No borrowing
+                        'borrow_apy': Decimal('0'),  # No borrowing in conservative
+                        'ltv': ltv,  # Historical LTV (not used since no leverage)
+                        'liquidation_threshold': liq_threshold  # Historical threshold
                     }
                 }
 
@@ -297,6 +336,19 @@ def compare_single_vs_diversified(
     aave_data = fetch_protocol_data(fetcher, 'aave-v3', 'USDC', days_back)
 
     if aave_data:
+        # Fetch risk parameters for Aave
+        start_date = aave_data[0].timestamp
+        risk_params_aave = get_risk_parameters_for_simulation(
+            protocol='aave-v3',
+            asset_symbol='USDC',
+            start_date=start_date,
+            days=days_back,
+            network='mainnet'
+        )
+
+        # Get initial risk parameters
+        initial_ltv, initial_liq_threshold = risk_params_aave[0]
+
         treasury_single = TreasurySimulator(initial_capital=initial_capital, name="Single Protocol")
         treasury_single.deposit(
             protocol='aave-v3',
@@ -305,28 +357,33 @@ def compare_single_vs_diversified(
             supply_apy=aave_data[0].apy,
             borrow_apy=Decimal('0'),
             ltv=Decimal('0'),
-            liquidation_threshold=Decimal('0.85')
+            liquidation_threshold=initial_liq_threshold
         )
 
         def single_market_data(day_index: int) -> Dict:
-            if day_index < len(aave_data):
+            if day_index < len(aave_data) and day_index < len(risk_params_aave):
+                ltv, liq_threshold = risk_params_aave[day_index]
                 return {
                     'aave-v3': {
                         'USDC': {
                             'supply_apy': aave_data[day_index].apy,
-                            'borrow_apy': Decimal('0')
+                            'borrow_apy': Decimal('0'),
+                            'ltv': ltv,
+                            'liquidation_threshold': liq_threshold
                         }
                     }
                 }
             return {}
 
+        # Use minimum length between data and risk parameters
+        sim_days = min(len(aave_data), len(risk_params_aave))
         snapshots_single = treasury_single.run_simulation(
-            days=len(aave_data),
+            days=sim_days,
             market_data_generator=single_market_data
         )
 
         values_single = [initial_capital] + [s.net_value for s in snapshots_single]
-        metrics_single = PerformanceMetrics().calculate_all_metrics(values_single, days=len(aave_data))
+        metrics_single = PerformanceMetrics().calculate_all_metrics(values_single, days=sim_days)
 
         print(f"  Total Return: {metrics_single['total_return_pct']:.2f}%")
         print(f"  Annualized Return: {metrics_single['annualized_return_pct']:.2f}%")
