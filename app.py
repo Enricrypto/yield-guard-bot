@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 import sqlite3
 import sys
 from pathlib import Path
@@ -197,7 +198,7 @@ def run_simulation_process(
     strategy_name: str,
     min_health_factor: float,
     simulation_days: int,
-    market_regime: str,
+    market_regime: Literal['normal', 'bull', 'bear', 'volatile'],
     random_seed: int,
     aave_allocation: float,
     morpho_allocation: float
