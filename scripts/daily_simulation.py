@@ -213,13 +213,13 @@ def run_conservative_simulation(
         created_at=datetime.now()
     )
 
-    db.save_simulation_run(simulation_run)
-    print(f"✓ Simulation run saved (ID: {simulation_run.id})")
+    simulation_id = db.save_simulation_run(simulation_run)
+    print(f"✓ Simulation run saved (ID: {simulation_id})")
 
     # Save snapshots
     for i, snapshot in enumerate(snapshots):
         portfolio_snapshot = PortfolioSnapshot(
-            simulation_id=simulation_run.id,
+            simulation_id=simulation_id,
             day=i + 1,
             net_value=float(snapshot.net_value),
             total_collateral=float(snapshot.total_collateral),
@@ -234,7 +234,7 @@ def run_conservative_simulation(
 
     return {
         'strategy': strategy_name,
-        'simulation_id': simulation_run.id,
+        'simulation_id': simulation_id,
         'metrics': metrics,
         'snapshots': snapshots
     }
