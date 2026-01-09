@@ -286,8 +286,8 @@ class HistoricalDataFetcher:
             key = f"{protocol}_{asset}_{chain}"
 
             historical = self.get_historical_data_for_backtest(
-                protocol=protocol,
-                asset_symbol=asset,
+                protocol=protocol, # type: ignore
+                asset_symbol=asset, # type: ignore
                 chain=chain,
                 days_back=days_back
             )
