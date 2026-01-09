@@ -7,8 +7,9 @@ __pycache__/
 .env
 venv/
 
-# VSCode
-.vscode/
+# VSCode (exclude all except settings.json which has workspace config)
+.vscode/*
+!.vscode/settings.json
 
 # Claude Code
 .claude/
