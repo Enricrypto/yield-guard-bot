@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, cast
 import sqlite3
 import sys
 from pathlib import Path
@@ -186,7 +186,7 @@ def render_simulation_tab():
             strategy_name=strategy_name,
             min_health_factor=min_health_factor,
             simulation_days=simulation_days,
-            market_regime=market_regime,
+            market_regime=cast(Literal['normal', 'bull', 'bear', 'volatile'], market_regime),
             random_seed=random_seed,
             aave_allocation=aave_allocation / 100,
             morpho_allocation=morpho_allocation / 100
