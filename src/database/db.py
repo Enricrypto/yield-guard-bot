@@ -153,7 +153,7 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-        return simulation_id
+        return int(simulation_id)
 
     def save_portfolio_snapshot(self, snapshot: PortfolioSnapshot) -> int:
         """
@@ -190,7 +190,7 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-        return snapshot_id
+        return int(snapshot_id)
 
     def get_simulation_by_id(self, simulation_id: int) -> Optional[SimulationRun]:
         """
