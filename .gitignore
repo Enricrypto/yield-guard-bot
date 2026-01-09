@@ -18,3 +18,31 @@ venv/
 
 # Logs
 *.log
+logs/
+
+# Database (excluded from git, stored in GitHub Actions cache/artifacts)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Coverage reports
+htmlcov/
+.coverage
+.pytest_cache/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Virtual environments
+.venv/
+env/
+
+# Temporary files
+*.tmp
+*.temp
+simulation_summary.txt
+
+# Debug files
+debug_*.py
