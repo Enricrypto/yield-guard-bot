@@ -725,6 +725,26 @@ def render_history_tab():
                         Recent Simulations ({len(rows)} runs)
                     </h3>
                 </div>
+                <style>
+                    /* Force JetBrains Mono on dataframe - ultra aggressive */
+                    [data-testid="stDataFrame"] {{
+                        font-family: 'JetBrains Mono', monospace !important;
+                    }}
+                    [data-testid="stDataFrame"] * {{
+                        font-family: 'JetBrains Mono', monospace !important;
+                    }}
+                    [data-testid="stDataFrame"] div,
+                    [data-testid="stDataFrame"] span,
+                    [data-testid="stDataFrame"] p {{
+                        font-family: 'JetBrains Mono', monospace !important;
+                    }}
+                    /* Column headers */
+                    [data-testid="stDataFrame"] [role="columnheader"] {{
+                        font-family: 'Space Grotesk', sans-serif !important;
+                        text-transform: uppercase !important;
+                        letter-spacing: 0.05em !important;
+                    }}
+                </style>
                 """,
                 unsafe_allow_html=True
             )
