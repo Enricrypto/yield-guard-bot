@@ -62,6 +62,25 @@ def get_db_connection():
     db.init_db()
     return conn
 
+
+def format_number_eu(value: float, decimals: int = 2) -> str:
+    """Format number with European notation (. for thousands, , for decimals)"""
+    # Format with specified decimals
+    formatted = f"{value:,.{decimals}f}"
+    # Swap commas and periods for European notation
+    formatted = formatted.replace(',', 'TEMP').replace('.', ',').replace('TEMP', '.')
+    return formatted
+
+
+def format_currency_eu(value: float) -> str:
+    """Format currency with European notation (max 2 decimals)"""
+    return f"${format_number_eu(value, 2)}"
+
+
+def format_percentage_eu(value: float) -> str:
+    """Format percentage with European notation (max 2 decimals)"""
+    return f"{format_number_eu(value, 2)}%"
+
 # ---------------------------------------------------------------------
 # Simulation Tab
 # ---------------------------------------------------------------------
@@ -491,15 +510,15 @@ def render_dashboard_tab():
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="wallet" style="vertical-align:middle;"></ion-icon>
                 Portfolio Value
-                <span title="Your current total portfolio value including all positions, collateral, and debt. Compares to your initial investment." style="cursor:help; margin-left:0.25rem;">
-                    <ion-icon name="help-circle-outline" style="font-size:0.9rem; vertical-align:middle; opacity:0.6;"></ion-icon>
-                </span>
             </div>
             <div style="font-size:2rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;">
-                ${final_val:,.2f}
+                {format_currency_eu(final_val)}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.85rem;margin-top:0.5rem;">
-                Initial: ${initial_cap:,.2f}
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
+                Initial: {format_currency_eu(initial_cap)}
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+                Total value including positions, collateral & debt
             </div>
         </div>
         """
@@ -507,41 +526,43 @@ def render_dashboard_tab():
 
     with col2:
         pnl_color = colors.GRADIENT_TEAL if pnl >= 0 else colors.ACCENT_RED
-        pnl_icon = "mdi:trending-up" if pnl >= 0 else "mdi:trending-down"
+        pnl_icon = "trending-up" if pnl >= 0 else "trending-down"
         metric_card_html = f"""
         <div class="bento-item" style="padding:1.5rem;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
-                <span class="iconify" data-icon="{pnl_icon}" style="vertical-align:middle;"></ion-icon>
+                <ion-icon name="{pnl_icon}" style="vertical-align:middle;"></ion-icon>
                 P&L
-                <span title="Profit & Loss - Your total gain or loss as both percentage and dollar amount. Calculated as (Final Value - Initial Capital) / Initial Capital." style="cursor:help; margin-left:0.25rem;">
-                    <ion-icon name="help-circle-outline" style="font-size:0.9rem; vertical-align:middle; opacity:0.6;"></ion-icon>
-                </span>
             </div>
             <div style="font-size:2rem;color:{pnl_color};font-family:JetBrains Mono,monospace;">
-                {'+' if pnl >= 0 else ''}{pnl_pct:.2f}%
+                {'+' if pnl >= 0 else ''}{format_percentage_eu(pnl_pct)}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.85rem;margin-top:0.5rem;">
-                ${pnl:+,.2f}
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
+                {'+' if pnl >= 0 else ''}{format_currency_eu(abs(pnl))}
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+                (Final - Initial) / Initial Capital
             </div>
         </div>
         """
         st.markdown(metric_card_html, unsafe_allow_html=True)
 
     with col3:
+        # Clamp Sharpe to reasonable values
+        sharpe_clamped = min(max(float(sharpe), -10), 10)
         metric_card_html = f"""
         <div class="bento-item" style="padding:1.5rem;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
-                <ion-icon name="chart-line-variant" style="vertical-align:middle;"></ion-icon>
+                <ion-icon name="analytics" style="vertical-align:middle;"></ion-icon>
                 Sharpe Ratio
-                <span title="Risk-adjusted return metric. Measures how much return you earn per unit of risk. Higher is better. >1.0 = Good, >1.5 = Very Good, >2.0 = Excellent." style="cursor:help; margin-left:0.25rem;">
-                    <ion-icon name="help-circle-outline" style="font-size:0.9rem; vertical-align:middle; opacity:0.6;"></ion-icon>
-                </span>
             </div>
             <div style="font-size:2rem;color:{colors.GRADIENT_TEAL};font-family:JetBrains Mono,monospace;">
-                {float(sharpe):.2f}
+                {format_number_eu(sharpe_clamped, 2)}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.85rem;margin-top:0.5rem;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Risk-adjusted return
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+                >1,0 Good, >1,5 Very Good, >2,0 Excellent
             </div>
         </div>
         """
@@ -553,15 +574,15 @@ def render_dashboard_tab():
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="alert-circle" style="vertical-align:middle;"></ion-icon>
                 Max Drawdown
-                <span title="Peak to trough decline - The largest drop from a high point to a low point in your portfolio value. Shows the worst temporary loss you would have experienced. Lower is better." style="cursor:help; margin-left:0.25rem;">
-                    <ion-icon name="help-circle-outline" style="font-size:0.9rem; vertical-align:middle; opacity:0.6;"></ion-icon>
-                </span>
             </div>
             <div style="font-size:2rem;color:{colors.GRADIENT_ORANGE};font-family:JetBrains Mono,monospace;">
-                {drawdown:.2f}%
+                {format_percentage_eu(drawdown)}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.85rem;margin-top:0.5rem;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Peak to trough
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+                Largest drop from high to low. Lower is better
             </div>
         </div>
         """
@@ -688,12 +709,12 @@ def render_history_tab():
                 'Sharpe Ratio', 'Max Drawdown', 'Rebalances', 'Date'
             ])
 
-            # Format columns
-            df['Initial Capital'] = df['Initial Capital'].apply(lambda x: f"${x:,.2f}")
-            df['Final Value'] = df['Final Value'].apply(lambda x: f"${x:,.2f}")
-            df['Total Return'] = df['Total Return'].apply(lambda x: f"{x*100:+.2f}%")
-            df['Sharpe Ratio'] = df['Sharpe Ratio'].apply(lambda x: f"{x:.2f}")
-            df['Max Drawdown'] = df['Max Drawdown'].apply(lambda x: f"{x*100:.2f}%")
+            # Format columns with European notation
+            df['Initial Capital'] = df['Initial Capital'].apply(lambda x: format_currency_eu(x))
+            df['Final Value'] = df['Final Value'].apply(lambda x: format_currency_eu(x))
+            df['Total Return'] = df['Total Return'].apply(lambda x: f"{'+' if x >= 0 else ''}{format_percentage_eu(x*100)}")
+            df['Sharpe Ratio'] = df['Sharpe Ratio'].apply(lambda x: format_number_eu(min(max(x, -10), 10), 2))  # Clamp to reasonable range
+            df['Max Drawdown'] = df['Max Drawdown'].apply(lambda x: format_percentage_eu(x*100))
             df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d %H:%M')
 
             st.markdown(
