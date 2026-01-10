@@ -506,7 +506,7 @@ def render_dashboard_tab():
 
     with col1:
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem;">
+        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="wallet" style="vertical-align:middle;"></ion-icon>
                 Portfolio Value
@@ -517,7 +517,7 @@ def render_dashboard_tab():
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Initial: {format_currency_eu(initial_cap)}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
                 Total value including positions, collateral & debt
             </div>
         </div>
@@ -528,7 +528,7 @@ def render_dashboard_tab():
         pnl_color = colors.GRADIENT_TEAL if pnl >= 0 else colors.ACCENT_RED
         pnl_icon = "trending-up" if pnl >= 0 else "trending-down"
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem;">
+        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="{pnl_icon}" style="vertical-align:middle;"></ion-icon>
                 P&L
@@ -539,7 +539,7 @@ def render_dashboard_tab():
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 {'+' if pnl >= 0 else ''}{format_currency_eu(abs(pnl))}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
                 (Final - Initial) / Initial Capital
             </div>
         </div>
@@ -550,7 +550,7 @@ def render_dashboard_tab():
         # Clamp Sharpe to reasonable values
         sharpe_clamped = min(max(float(sharpe), -10), 10)
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem;">
+        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="analytics" style="vertical-align:middle;"></ion-icon>
                 Sharpe Ratio
@@ -561,7 +561,7 @@ def render_dashboard_tab():
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Risk-adjusted return
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
                 >1,0 Good, >1,5 Very Good, >2,0 Excellent
             </div>
         </div>
@@ -570,7 +570,7 @@ def render_dashboard_tab():
 
     with col4:
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem;">
+        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="alert-circle" style="vertical-align:middle;"></ion-icon>
                 Max Drawdown
@@ -581,7 +581,7 @@ def render_dashboard_tab():
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Peak to trough
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
                 Largest drop from high to low. Lower is better
             </div>
         </div>
@@ -958,7 +958,7 @@ def render_historical_backtest_tab():
     # Run Backtest Button
     st.markdown("---")
 
-    if st.button("🚀 RUN HISTORICAL BACKTEST", key="run_backtest_btn", use_container_width=True, type="primary"):
+    if st.button("RUN HISTORICAL BACKTEST", key="run_backtest_btn", use_container_width=True, type="primary"):
         with st.spinner(f"Fetching {days_back} days of historical data..."):
             try:
                 # Initialize database and fetcher
