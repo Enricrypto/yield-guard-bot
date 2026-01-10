@@ -1333,29 +1333,23 @@ def render_historical_backtest_tab():
                     progress_bar.progress(progress)
                     status_text.text(f"Day {day + 1}/{len(historical)}...")
 
-                    # Update APY with real historical data + volatility
+                    # Update APY with real historical data
                     if simulator.positions:
                         base_apy = historical[day].apy
 
-                        # Add market volatility to simulate realistic price movements
-                        # Historical data shows DeFi markets have daily volatility of ±0.5-2%
+                        # Use historical APY directly
+                        simulator.positions[0].supply_apy = base_apy
+                        simulator.positions[0].borrow_apy = base_apy * Decimal('1.2')
+
+                        # Add intra-day yield fluctuations to simulate realistic market conditions
+                        # This represents: utilization rate changes, liquidity events, liquidations
+                        # that affect actual daily yield beyond the stated APY
                         import random
-                        volatility_factor = Decimal(str(random.uniform(-0.02, 0.02)))  # ±2% daily
+                        daily_yield_noise = Decimal(str(random.uniform(-0.003, 0.003)))  # ±0.3% daily
 
-                        # Apply volatility to APY (affects interest accrual)
-                        volatile_supply_apy = base_apy * (Decimal('1') + volatility_factor)
-                        volatile_borrow_apy = base_apy * Decimal('1.2') * (Decimal('1') + volatility_factor)
-
-                        # Ensure APY stays positive
-                        volatile_supply_apy = max(Decimal('0.001'), volatile_supply_apy)
-                        volatile_borrow_apy = max(Decimal('0.002'), volatile_borrow_apy)
-
-                        simulator.positions[0].supply_apy = volatile_supply_apy
-                        simulator.positions[0].borrow_apy = volatile_borrow_apy
-
-                        # Simulate collateral value fluctuation (stablecoins have minimal but non-zero volatility)
-                        collateral_volatility = Decimal(str(random.uniform(-0.005, 0.005)))  # ±0.5%
-                        simulator.positions[0].collateral_amount *= (Decimal('1') + collateral_volatility)
+                        # Apply to collateral amount to represent actual yield realization
+                        # (stablecoins stay at $1, but yield realization has daily variance)
+                        simulator.positions[0].collateral_amount *= (Decimal('1') + daily_yield_noise)
 
                     # Step forward
                     snapshot = simulator.step(days=Decimal('1'))
