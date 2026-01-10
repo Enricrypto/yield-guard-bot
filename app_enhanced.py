@@ -1378,22 +1378,23 @@ def render_historical_backtest_tab():
                 max_dd_data = metrics.calculate_max_drawdown(portfolio_values)
                 max_drawdown = max_dd_data['max_drawdown']
 
-                # Calculate Sharpe ratio
-                daily_returns = []
+                # Calculate daily returns as Decimal
+                daily_returns_decimal = []
                 for i in range(1, len(portfolio_values)):
                     prev_val = portfolio_values[i-1]
                     curr_val = portfolio_values[i]
                     if prev_val > 0:
-                        daily_return = float((curr_val - prev_val) / prev_val)
-                        daily_returns.append(daily_return)
+                        daily_return = (curr_val - prev_val) / prev_val
+                        daily_returns_decimal.append(daily_return)
 
-                sharpe = metrics.calculate_sharpe_ratio(daily_returns)
+                # Calculate Sharpe ratio
+                sharpe = metrics.calculate_sharpe_ratio(daily_returns_decimal)
 
                 # Calculate Sortino ratio (downside risk-adjusted)
-                sortino = metrics.calculate_sortino_ratio([Decimal(str(r)) for r in daily_returns])
+                sortino = metrics.calculate_sortino_ratio(daily_returns_decimal)
 
                 # Calculate Win Rate (% of profitable days)
-                win_rate = metrics.calculate_win_rate([Decimal(str(r)) for r in daily_returns])
+                win_rate = metrics.calculate_win_rate(daily_returns_decimal)
 
                 # Display Results
                 st.markdown("---")
