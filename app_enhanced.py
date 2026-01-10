@@ -717,6 +717,22 @@ def render_history_tab():
             df['Max Drawdown'] = df['Max Drawdown'].apply(lambda x: format_percentage_eu(x*100))
             df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d %H:%M')
 
+            # Build HTML table with full control
+            table_rows = ""
+            for _, row in df.iterrows():
+                table_rows += f"""
+                <tr>
+                    <td>{row['ID']}</td>
+                    <td>{row['Initial Capital']}</td>
+                    <td>{row['Final Value']}</td>
+                    <td>{row['Total Return']}</td>
+                    <td>{row['Sharpe Ratio']}</td>
+                    <td>{row['Max Drawdown']}</td>
+                    <td>{row['Rebalances']}</td>
+                    <td>{row['Date']}</td>
+                </tr>
+                """
+
             st.markdown(
                 f"""
                 <div class="bento-item">
@@ -725,36 +741,44 @@ def render_history_tab():
                         Recent Simulations ({len(rows)} runs)
                     </h3>
                 </div>
+                <div class="bento-item" style="padding:0; overflow:auto; max-height:500px;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead style="position:sticky; top:0; z-index:10;">
+                            <tr>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">ID</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Initial Capital</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Final Value</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Total Return</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Sharpe Ratio</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Max Drawdown</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Rebalances</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {table_rows}
+                        </tbody>
+                    </table>
+                </div>
                 <style>
-                    /* Force JetBrains Mono on dataframe - ultra aggressive */
-                    [data-testid="stDataFrame"] {{
-                        font-family: 'JetBrains Mono', monospace !important;
+                    .bento-item table tbody tr {{
+                        background:{colors.BG_SECONDARY};
+                        transition: all 0.2s ease;
                     }}
-                    [data-testid="stDataFrame"] * {{
-                        font-family: 'JetBrains Mono', monospace !important;
+                    .bento-item table tbody tr:hover {{
+                        background:{colors.BG_TERTIARY};
                     }}
-                    [data-testid="stDataFrame"] div,
-                    [data-testid="stDataFrame"] span,
-                    [data-testid="stDataFrame"] p {{
-                        font-family: 'JetBrains Mono', monospace !important;
-                    }}
-                    /* Column headers */
-                    [data-testid="stDataFrame"] [role="columnheader"] {{
-                        font-family: 'Space Grotesk', sans-serif !important;
-                        text-transform: uppercase !important;
-                        letter-spacing: 0.05em !important;
+                    .bento-item table tbody td {{
+                        color:{colors.TEXT_PRIMARY};
+                        font-family:'JetBrains Mono',monospace;
+                        font-size:0.875rem;
+                        font-weight:600;
+                        padding:0.875rem 1rem;
+                        border-bottom:1px solid {colors.BORDER_PRIMARY};
                     }}
                 </style>
                 """,
                 unsafe_allow_html=True
-            )
-
-            # Display table
-            st.dataframe(
-                df,
-                use_container_width=True,
-                height=500,
-                hide_index=True
             )
 
             # Summary stats
