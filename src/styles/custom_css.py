@@ -370,15 +370,31 @@ def get_custom_css() -> str:
         background-color: {colors.BG_TERTIARY} !important;
     }}
 
-    /* DataFrame Cells */
+    /* DataFrame Cells - All possible selectors */
     [data-testid="stDataFrame"] tbody tr td,
+    [data-testid="stDataFrame"] table tbody tr td,
     .stDataFrame tbody tr td,
-    div[data-testid="stDataFrame"] table tbody td {{
+    div[data-testid="stDataFrame"] table tbody td,
+    div[data-testid="stDataFrame"] tbody td,
+    [data-testid="stDataFrame"] div[role="gridcell"],
+    [data-testid="stDataFrame"] div[data-testid="stDataFrameResizable"] {{
         color: {colors.TEXT_SECONDARY} !important;
         padding: 0.875rem 1rem !important;
         border-bottom: 1px solid {colors.BORDER_PRIMARY} !important;
         font-family: 'JetBrains Mono', monospace !important;
         font-size: 0.875rem !important;
+        font-weight: 500 !important;
+    }}
+
+    /* Apply to all elements inside dataframe */
+    [data-testid="stDataFrame"] * {{
+        font-family: 'JetBrains Mono', monospace !important;
+    }}
+
+    /* Headers should use Space Grotesk */
+    [data-testid="stDataFrame"] thead *,
+    [data-testid="stDataFrame"] th * {{
+        font-family: 'Space Grotesk', sans-serif !important;
     }}
 
     /* Make numeric columns stand out */
@@ -386,7 +402,12 @@ def get_custom_css() -> str:
     [data-testid="stDataFrame"] tbody tr td:nth-child(3),
     [data-testid="stDataFrame"] tbody tr td:nth-child(4),
     [data-testid="stDataFrame"] tbody tr td:nth-child(5),
-    [data-testid="stDataFrame"] tbody tr td:nth-child(6) {{
+    [data-testid="stDataFrame"] tbody tr td:nth-child(6),
+    [data-testid="stDataFrame"] div[role="gridcell"]:nth-child(2),
+    [data-testid="stDataFrame"] div[role="gridcell"]:nth-child(3),
+    [data-testid="stDataFrame"] div[role="gridcell"]:nth-child(4),
+    [data-testid="stDataFrame"] div[role="gridcell"]:nth-child(5),
+    [data-testid="stDataFrame"] div[role="gridcell"]:nth-child(6) {{
         font-weight: 600 !important;
         color: {colors.TEXT_PRIMARY} !important;
     }}
