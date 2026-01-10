@@ -234,23 +234,28 @@ class TreasurySimulator:
         Raises:
             ValueError: If insufficient capital
         """
-        if amount > self.available_capital:
-            raise ValueError(f"Insufficient capital. Available: {self.available_capital}, Requested: {amount}")
-
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
 
         # Calculate transaction costs
         costs = self._calculate_transaction_costs('deposit', amount, protocol)
 
-        # Deduct costs from available capital
-        self.available_capital -= costs['total_cost']
+        # Check if we have enough capital for amount + costs
+        total_required = amount + costs['gas_fee']  # Gas is separate from amount
+        if total_required > self.available_capital:
+            raise ValueError(f"Insufficient capital. Available: {self.available_capital}, Required: {total_required} (amount: {amount} + gas: {costs['gas_fee']})")
+
+        # Track costs
         self.total_gas_fees += costs['gas_fee']
         self.total_protocol_fees += costs['protocol_fee']
         self.total_slippage += costs['slippage']
         self.num_transactions += 1
 
-        # Actual amount deposited after fees
+        # Deduct amount and gas fee from available capital
+        self.available_capital -= amount
+        self.available_capital -= costs['gas_fee']
+
+        # Actual amount deposited after protocol fees & slippage (deducted from the deposit amount)
         net_amount = amount - costs['protocol_fee'] - costs['slippage']
 
         # Create position
@@ -266,7 +271,6 @@ class TreasurySimulator:
         )
 
         self.positions.append(position)
-        self.available_capital -= amount  # Deduct principal
 
         return position
 

@@ -208,11 +208,25 @@ def render_simulation_tab():
                     total_capital = Decimal(str(initial_capital))
                     num_protocols = len(protocols)
 
-                    # Calculate per-protocol amount, rounding to 2 decimal places
-                    capital_per_protocol = (total_capital / num_protocols).quantize(Decimal('0.01'))
+                    # Estimate transaction costs to reserve capital
+                    # Gas fee per deposit is ~$15, protocol fees vary by protocol (0-0.09%)
+                    estimated_gas_per_deposit = Decimal('15.00')
+                    total_estimated_gas = estimated_gas_per_deposit * num_protocols
+
+                    # Reserve additional buffer for protocol fees and slippage (~0.1% of capital)
+                    estimated_protocol_fees = total_capital * Decimal('0.001')
+
+                    # Total costs to reserve
+                    total_reserved_costs = total_estimated_gas + estimated_protocol_fees
+
+                    # Capital available for actual deposits (after reserving for costs)
+                    deployable_capital = total_capital - total_reserved_costs
+
+                    # Calculate per-protocol amount from deployable capital
+                    capital_per_protocol = (deployable_capital / num_protocols).quantize(Decimal('0.01'))
 
                     # For the last protocol, use remaining capital to avoid rounding errors
-                    remaining_capital = total_capital
+                    remaining_capital = deployable_capital
 
                     # Define APY ranges based on risk tolerance
                     # Using realistic DeFi lending rates (updated for better returns)
