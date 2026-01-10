@@ -334,37 +334,61 @@ def get_custom_css() -> str:
         box-shadow: 0 4px 16px {colors.SHADOW_SM};
     }}
 
+    /* DataFrame Container */
     [data-testid="stDataFrame"] {{
         background-color: {colors.BG_SECONDARY};
+        border-radius: 12px;
+        overflow: hidden;
     }}
 
-    .stDataFrame thead tr th {{
+    /* DataFrame Headers */
+    [data-testid="stDataFrame"] thead tr th,
+    .stDataFrame thead tr th,
+    div[data-testid="stDataFrame"] table thead th {{
         background: linear-gradient(135deg, {colors.BG_TERTIARY} 0%, {colors.BG_SECONDARY} 100%) !important;
         color: {colors.TEXT_PRIMARY} !important;
         font-weight: 700 !important;
-        font-size: 0.875rem !important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        font-size: 0.75rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
         padding: 1rem !important;
         border-bottom: 2px solid {colors.BORDER_ACCENT} !important;
+        font-family: 'Space Grotesk', sans-serif !important;
     }}
 
-    .stDataFrame tbody tr {{
-        background-color: {colors.BG_SECONDARY};
+    /* DataFrame Body Rows */
+    [data-testid="stDataFrame"] tbody tr,
+    .stDataFrame tbody tr,
+    div[data-testid="stDataFrame"] table tbody tr {{
+        background-color: {colors.BG_SECONDARY} !important;
         transition: all 0.2s ease;
     }}
 
-    .stDataFrame tbody tr:hover {{
+    [data-testid="stDataFrame"] tbody tr:hover,
+    .stDataFrame tbody tr:hover,
+    div[data-testid="stDataFrame"] table tbody tr:hover {{
         background-color: {colors.BG_TERTIARY} !important;
-        transform: scale(1.01);
     }}
 
-    .stDataFrame tbody tr td {{
+    /* DataFrame Cells */
+    [data-testid="stDataFrame"] tbody tr td,
+    .stDataFrame tbody tr td,
+    div[data-testid="stDataFrame"] table tbody td {{
         color: {colors.TEXT_SECONDARY} !important;
         padding: 0.875rem 1rem !important;
         border-bottom: 1px solid {colors.BORDER_PRIMARY} !important;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.875rem;
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 0.875rem !important;
+    }}
+
+    /* Make numeric columns stand out */
+    [data-testid="stDataFrame"] tbody tr td:nth-child(2),
+    [data-testid="stDataFrame"] tbody tr td:nth-child(3),
+    [data-testid="stDataFrame"] tbody tr td:nth-child(4),
+    [data-testid="stDataFrame"] tbody tr td:nth-child(5),
+    [data-testid="stDataFrame"] tbody tr td:nth-child(6) {{
+        font-weight: 600 !important;
+        color: {colors.TEXT_PRIMARY} !important;
     }}
 
     /* Progress Bar */
