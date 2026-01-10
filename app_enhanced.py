@@ -314,8 +314,8 @@ def render_simulation_tab():
                         max_drawdown=float(max_drawdown),
                         sharpe_ratio=float(sharpe),
                         final_value=float(final_value),
-                        total_gas_fees=0.0,  # Will be implemented later
-                        num_rebalances=0,  # Will be implemented later
+                        total_gas_fees=float(simulator.total_gas_fees),
+                        num_rebalances=simulator.num_transactions,  # Track total transactions for now
                         created_at=datetime.now()
                     )
 
@@ -342,6 +342,37 @@ def render_simulation_tab():
                     status_text.empty()
 
                     st.markdown(f'<p style="color:#00c851;"><ion-icon name="checkmark-circle" style="vertical-align:middle;"></ion-icon> Simulation complete! Final value: {format_currency_eu(float(final_value))} | Return: {format_percentage_eu(float(total_return)*100)}</p>', unsafe_allow_html=True)
+
+                    # Display transaction costs summary
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1rem; border-radius:8px; margin:1rem 0;">
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; text-transform:uppercase; margin:0 0 0.5rem 0;">Transaction Costs</p>
+                            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; font-family:JetBrains Mono,monospace; font-size:0.85rem;">
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Gas Fees:</span>
+                                    <span style="color:{colors.ACCENT_RED}; margin-left:0.5rem;">{format_currency_eu(float(simulator.total_gas_fees))}</span>
+                                </div>
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Protocol Fees:</span>
+                                    <span style="color:{colors.ACCENT_ORANGE}; margin-left:0.5rem;">{format_currency_eu(float(simulator.total_protocol_fees))}</span>
+                                </div>
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Slippage:</span>
+                                    <span style="color:{colors.ACCENT_ORANGE}; margin-left:0.5rem;">{format_currency_eu(float(simulator.total_slippage))}</span>
+                                </div>
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Total Costs:</span>
+                                    <span style="color:{colors.ACCENT_RED}; margin-left:0.5rem; font-weight:700;">{format_currency_eu(float(simulator.total_gas_fees + simulator.total_protocol_fees + simulator.total_slippage))}</span>
+                                </div>
+                            </div>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.5rem 0 0 0; font-style:italic;">
+                                {simulator.num_transactions} transactions executed
+                            </p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
                     # Display per-protocol performance breakdown
                     if simulator.positions:

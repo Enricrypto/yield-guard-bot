@@ -92,9 +92,70 @@ class TreasurySimulator:
         self.history: List[PortfolioSnapshot] = []
         self.cumulative_yield = Decimal('0')
 
+        # Cost tracking
+        self.total_gas_fees = Decimal('0')
+        self.total_protocol_fees = Decimal('0')
+        self.total_slippage = Decimal('0')
+        self.num_transactions = 0
+
         # Metadata
         self.created_at = datetime.now()
         self.current_date = datetime.now()
+
+    def _calculate_transaction_costs(
+        self,
+        transaction_type: str,
+        amount: Decimal,
+        protocol: str
+    ) -> Dict[str, Decimal]:
+        """
+        Calculate realistic transaction costs for stablecoin operations
+
+        Args:
+            transaction_type: 'deposit', 'withdraw', 'borrow', 'repay', or 'rebalance'
+            amount: Transaction amount in USD
+            protocol: Protocol name
+
+        Returns:
+            Dictionary with gas_fee, protocol_fee, slippage, total_cost
+        """
+        # Gas fees (in USD) - Ethereum mainnet estimates for stablecoin operations
+        # These are realistic 2025 estimates based on moderate gas prices
+        gas_fees = {
+            'deposit': Decimal('15.00'),      # ~$15 for ERC20 approve + deposit
+            'withdraw': Decimal('12.00'),     # ~$12 for withdraw
+            'borrow': Decimal('18.00'),       # ~$18 for borrow (more complex)
+            'repay': Decimal('15.00'),        # ~$15 for ERC20 approve + repay
+            'rebalance': Decimal('25.00')     # ~$25 for withdraw + deposit combo
+        }
+
+        # Protocol fees (percentage of amount)
+        # Most lending protocols charge 0-0.1% for deposits/withdrawals
+        protocol_fee_rates = {
+            'aave-v3': Decimal('0.0009'),      # 0.09%
+            'compound-v3': Decimal('0.0000'),  # 0% (Compound doesn't charge deposit fees)
+            'morpho-v1': Decimal('0.0005')     # 0.05%
+        }
+
+        # Stablecoin slippage (very minimal for stablecoins)
+        # Only applies to large transactions or during market stress
+        # For lending markets, slippage is near zero
+        slippage_rate = Decimal('0.0001')  # 0.01% - minimal for stablecoins
+
+        gas_fee = gas_fees.get(transaction_type, Decimal('15.00'))
+        protocol_fee_rate = protocol_fee_rates.get(protocol, Decimal('0.0005'))
+
+        protocol_fee = amount * protocol_fee_rate
+        slippage = amount * slippage_rate if amount > Decimal('10000') else Decimal('0')  # Only for large txs
+
+        total_cost = gas_fee + protocol_fee + slippage
+
+        return {
+            'gas_fee': gas_fee,
+            'protocol_fee': protocol_fee,
+            'slippage': slippage,
+            'total_cost': total_cost
+        }
 
     def deposit(
         self,
@@ -130,11 +191,24 @@ class TreasurySimulator:
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
 
+        # Calculate transaction costs
+        costs = self._calculate_transaction_costs('deposit', amount, protocol)
+
+        # Deduct costs from available capital
+        self.available_capital -= costs['total_cost']
+        self.total_gas_fees += costs['gas_fee']
+        self.total_protocol_fees += costs['protocol_fee']
+        self.total_slippage += costs['slippage']
+        self.num_transactions += 1
+
+        # Actual amount deposited after fees
+        net_amount = amount - costs['protocol_fee'] - costs['slippage']
+
         # Create position
         position = Position(
             protocol=protocol,
             asset_symbol=asset_symbol,
-            collateral_amount=amount,
+            collateral_amount=net_amount,  # Deposit net amount after protocol fees & slippage
             ltv=ltv,
             liquidation_threshold=liquidation_threshold,
             supply_apy=supply_apy,
@@ -143,7 +217,7 @@ class TreasurySimulator:
         )
 
         self.positions.append(position)
-        self.available_capital -= amount
+        self.available_capital -= amount  # Deduct principal
 
         return position
 
