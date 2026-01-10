@@ -288,6 +288,31 @@ class PerformanceMetrics:
 
         return annualized_return / abs_max_dd
 
+    def calculate_win_rate(
+        self,
+        returns: List[Decimal]
+    ) -> Decimal:
+        """
+        Calculate win rate (percentage of profitable periods)
+        Especially useful for stablecoin strategies where consistency matters
+
+        Args:
+            returns: List of period returns
+
+        Returns:
+            Win rate as decimal (0.75 = 75%)
+        """
+        if not returns:
+            return Decimal('0')
+
+        winning_periods = sum(1 for r in returns if r > 0)
+        total_periods = len(returns)
+
+        if total_periods == 0:
+            return Decimal('0')
+
+        return Decimal(winning_periods) / Decimal(total_periods)
+
     def calculate_all_metrics(
         self,
         portfolio_values: List[Decimal],
@@ -333,6 +358,7 @@ class PerformanceMetrics:
         sharpe_ratio = self.calculate_sharpe_ratio(returns, annualize=True)
         sortino_ratio = self.calculate_sortino_ratio(returns, annualize=True)
         calmar_ratio = self.calculate_calmar_ratio(annualized_return, max_dd_info['max_drawdown'])  # type: ignore[arg-type]
+        win_rate = self.calculate_win_rate(returns)
 
         return {
             # Basic metrics
@@ -356,6 +382,10 @@ class PerformanceMetrics:
             'sharpe_ratio': float(sharpe_ratio),
             'sortino_ratio': float(sortino_ratio),
             'calmar_ratio': float(calmar_ratio),
+
+            # Stablecoin-specific metrics
+            'win_rate': float(win_rate),
+            'win_rate_pct': float(win_rate * 100),
 
             # Additional info
             'num_periods': len(portfolio_values),
@@ -381,6 +411,8 @@ class PerformanceMetrics:
             'sharpe_ratio': 0,
             'sortino_ratio': 0,
             'calmar_ratio': 0,
+            'win_rate': 0,
+            'win_rate_pct': 0,
             'num_periods': 0,
             'num_returns': 0,
             'risk_free_rate': 0,

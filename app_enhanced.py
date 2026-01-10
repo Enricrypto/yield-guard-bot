@@ -1389,6 +1389,12 @@ def render_historical_backtest_tab():
 
                 sharpe = metrics.calculate_sharpe_ratio(daily_returns)
 
+                # Calculate Sortino ratio (downside risk-adjusted)
+                sortino = metrics.calculate_sortino_ratio([Decimal(str(r)) for r in daily_returns])
+
+                # Calculate Win Rate (% of profitable days)
+                win_rate = metrics.calculate_win_rate([Decimal(str(r)) for r in daily_returns])
+
                 # Display Results
                 st.markdown("---")
                 st.markdown(
@@ -1445,6 +1451,63 @@ def render_historical_backtest_tab():
                         <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {sharpe_color};">
                             <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Sharpe Ratio</p>
                             <h2 style="color:{sharpe_color}; margin:0.5rem 0;">{sharpe:.2f}</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Risk-adjusted returns</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # Second row: Stablecoin-specific metrics
+                st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+                col5, col6, col7, col8 = st.columns(4)
+
+                with col5:
+                    sortino_color = colors.SUCCESS if sortino > 1.5 else colors.WARNING if sortino > 1.0 else colors.ERROR
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {sortino_color};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Sortino Ratio</p>
+                            <h2 style="color:{sortino_color}; margin:0.5rem 0;">{sortino:.2f}</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Downside risk-adjusted</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with col6:
+                    win_rate_pct = float(win_rate * 100)
+                    win_rate_color = colors.SUCCESS if win_rate_pct > 60 else colors.WARNING if win_rate_pct > 50 else colors.ERROR
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {win_rate_color};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Win Rate</p>
+                            <h2 style="color:{win_rate_color}; margin:0.5rem 0;">{win_rate_pct:.1f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">% of profitable days</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with col7:
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_PURPLE};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Days Simulated</p>
+                            <h2 style="color:{colors.GRADIENT_PURPLE}; margin:0.5rem 0;">{len(historical)}</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Real historical data</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with col8:
+                    avg_apy = sum(apys) / len(apys) if apys else 0
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_TEAL};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Avg APY</p>
+                            <h2 style="color:{colors.GRADIENT_TEAL}; margin:0.5rem 0;">{avg_apy:.2f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Historical average</p>
                         </div>
                         """,
                         unsafe_allow_html=True
