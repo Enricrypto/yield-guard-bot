@@ -11,6 +11,10 @@ from .color_palette import FintechColorPalette as colors
 def get_custom_css() -> str:
     """Generate complete custom CSS for the dashboard."""
     return f"""
+    <!-- Ionicons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
     <style>
     /* Import Google Fonts - Spark Style */
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -300,7 +304,8 @@ def get_custom_css() -> str:
     .stTabs [data-baseweb="tab"] {{
         background-color: transparent;
         border: none;
-        border-radius: 8px 8px 0 0;
+        border-bottom: 3px solid transparent;
+        border-radius: 0;
         color: {colors.TEXT_TERTIARY};
         font-weight: 600;
         font-size: 1rem;
@@ -309,14 +314,16 @@ def get_custom_css() -> str:
     }}
 
     .stTabs [data-baseweb="tab"]:hover {{
-        background-color: {colors.BG_TERTIARY};
+        background-color: transparent;
         color: {colors.TEXT_SECONDARY};
+        border-bottom: 3px solid {colors.TEXT_TERTIARY};
     }}
 
     .stTabs [data-baseweb="tab"][aria-selected="true"] {{
-        background: linear-gradient(135deg, {colors.BG_SECONDARY} 0%, {colors.BG_TERTIARY} 100%);
+        background-color: transparent;
         color: {colors.PRIMARY_BLUE};
         border-bottom: 3px solid {colors.PRIMARY_BLUE};
+        font-weight: 700;
     }}
 
     /* DataFrames / Tables */

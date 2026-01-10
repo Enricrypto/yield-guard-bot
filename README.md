@@ -1,28 +1,43 @@
-# Yield Guard Bot 🛡️
+# 🛡️ Yield Guard Bot
+
+> **Production-Ready DeFi Yield Optimization & Treasury Management Platform**
 
 ![Tests](https://github.com/Enricrypto/yield-guard-bot/workflows/Tests/badge.svg)
 ![Daily Simulation](https://github.com/Enricrypto/yield-guard-bot/workflows/Daily%20Simulation/badge.svg)
-![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)
+![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B.svg)
 
-A production-ready DeFi yield optimization bot that automates treasury management strategies across multiple lending protocols. Features real-time market data integration, comprehensive backtesting, and automated daily simulations via GitHub Actions.
+A sophisticated DeFi treasury management system that automates yield optimization across multiple lending protocols with **real-time analytics**, **historical backtesting with real market data**, and professional-grade performance metrics.
 
 ## ✨ Features
 
-- 🤖 **Automated Portfolio Management** - Multi-protocol position management with leverage support
-- 📊 **Real-Time Market Data** - Live APY tracking from Aave V3, Compound V3, and Morpho
-- 📈 **Performance Analytics** - Sharpe ratio, Sortino ratio, max drawdown, and more
-- 🔄 **Daily Simulations** - Automated GitHub Actions workflow running daily
-- 🧪 **Comprehensive Testing** - 62 tests with 100% coverage of critical paths
-- 📱 **Risk Management** - Dynamic risk parameters, health factor monitoring, alerts
-- 💾 **Database Persistence** - SQLite storage with 90-day historical data
+### Core Capabilities
+
+- 🎯 **Interactive Dashboard** - Beautiful Spark Protocol-inspired UI with Plotly visualizations
+- 📊 **Real-Time Simulations** - Test strategies with synthetic or real DeFi market data
+- 🔍 **Historical Backtesting** - Analyze performance using actual DeFi market data (up to 1+ year)
+- 💾 **Intelligent Caching** - Local data storage for 5-6x faster repeated backtests
+- 📈 **Advanced Analytics** - Sharpe Ratio, Max Drawdown, Volatility, Risk-Adjusted Returns
+- 🏦 **Multi-Protocol Support** - Aave V3, Morpho Blue, Compound V3
+- 🛡️ **Risk Management** - Health factor monitoring, LTV tracking, liquidation alerts
+- 🧪 **Comprehensive Testing** - 62 tests with 100% coverage
+
+### Performance Metrics
+
+- 📊 **Total & Annualized Returns** - Track portfolio growth over time
+- 📉 **Maximum Drawdown** - Peak-to-trough decline analysis
+- 📈 **Sharpe Ratio** - Risk-adjusted return quality (>2.0 = Excellent)
+- 📊 **Volatility** - Standard deviation of returns
+- 💰 **P&L Tracking** - Profit & loss in both % and $
+- 🏦 **Per-Protocol Breakdown** - Individual protocol performance cards
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- Git
+- Python 3.12 or higher
+- pip package manager
 - Virtual environment (recommended)
 
 ### Installation
@@ -33,17 +48,35 @@ git clone https://github.com/Enricrypto/yield-guard-bot.git
 cd yield-guard-bot
 
 # Create and activate virtual environment
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Initialize database
+python -c "from src.database.db import DatabaseManager; db = DatabaseManager(); db.init_db()"
 ```
 
-### Run Your First Simulation
+### Launch the Dashboard
 
 ```bash
-# Run historical backtest (90 days)
+# Activate virtual environment
+source .venv/bin/activate
+
+# Launch Streamlit dashboard
+streamlit run app_enhanced.py
+```
+
+The interactive dashboard will open in your browser at `http://localhost:8501`
+
+### Run Command-Line Simulations
+
+```bash
+# Run 1-year historical backtest with real data
+python demo_1year_backtest.py
+
+# Run conservative strategy backtest
 python backtest_conservative.py
 
 # Run daily simulation

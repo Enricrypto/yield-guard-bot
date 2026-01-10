@@ -23,6 +23,8 @@ class SimulationRun:
     sharpe_ratio: float
     final_value: float
     created_at: datetime
+    total_gas_fees: float = 0.0
+    num_rebalances: int = 0
     id: Optional[int] = None
 
 
@@ -37,6 +39,18 @@ class PortfolioSnapshot:
     overall_health_factor: Optional[float]
     cumulative_yield: float
     timestamp: datetime
+    id: Optional[int] = None
+
+
+@dataclass
+class HistoricalDataCache:
+    """Cached historical market data"""
+    protocol: str
+    asset_symbol: str
+    chain: str
+    days_back: int
+    data_json: str  # JSON string of historical data points
+    fetched_at: datetime
     id: Optional[int] = None
 
 
@@ -81,6 +95,8 @@ class DatabaseManager:
                 max_drawdown REAL NOT NULL,
                 sharpe_ratio REAL NOT NULL,
                 final_value REAL NOT NULL,
+                total_gas_fees REAL DEFAULT 0.0,
+                num_rebalances INTEGER DEFAULT 0,
                 created_at TIMESTAMP NOT NULL
             )
         """)
@@ -101,6 +117,19 @@ class DatabaseManager:
             )
         """)
 
+        # Create historical_data_cache table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historical_data_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                protocol TEXT NOT NULL,
+                asset_symbol TEXT NOT NULL,
+                chain TEXT NOT NULL,
+                days_back INTEGER NOT NULL,
+                data_json TEXT NOT NULL,
+                fetched_at TIMESTAMP NOT NULL
+            )
+        """)
+
         # Create indices for common queries
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_simulation_runs_created_at
@@ -110,6 +139,11 @@ class DatabaseManager:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_simulation_id
             ON portfolio_snapshots(simulation_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_historical_cache_lookup
+            ON historical_data_cache(protocol, asset_symbol, chain, days_back)
         """)
 
         conn.commit()
@@ -132,8 +166,9 @@ class DatabaseManager:
             INSERT INTO simulation_runs (
                 strategy_name, initial_capital, simulation_days,
                 protocols_used, total_return, annualized_return,
-                max_drawdown, sharpe_ratio, final_value, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                max_drawdown, sharpe_ratio, final_value, total_gas_fees,
+                num_rebalances, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             simulation.strategy_name,
             simulation.initial_capital,
@@ -144,6 +179,8 @@ class DatabaseManager:
             simulation.max_drawdown,
             simulation.sharpe_ratio,
             simulation.final_value,
+            simulation.total_gas_fees,
+            simulation.num_rebalances,
             simulation.created_at
         ))
 
@@ -368,6 +405,146 @@ class DatabaseManager:
         cursor.execute("""
             DELETE FROM simulation_runs WHERE id = ?
         """, (simulation_id,))
+
+        conn.commit()
+        conn.close()
+
+    def save_historical_data(
+        self,
+        protocol: str,
+        asset_symbol: str,
+        chain: str,
+        days_back: int,
+        historical_data: List[dict]
+    ) -> int:
+        """
+        Save historical market data to cache
+
+        Args:
+            protocol: Protocol name (e.g., 'aave-v3')
+            asset_symbol: Asset symbol (e.g., 'USDC')
+            chain: Chain name (e.g., 'Ethereum')
+            days_back: Number of days of historical data
+            historical_data: List of historical data points as dicts
+
+        Returns:
+            Cache ID
+        """
+        import json
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Convert historical data to JSON
+        data_json = json.dumps(historical_data)
+
+        # Check if cache already exists
+        cursor.execute("""
+            SELECT id FROM historical_data_cache
+            WHERE protocol = ? AND asset_symbol = ? AND chain = ? AND days_back = ?
+        """, (protocol, asset_symbol, chain, days_back))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            # Update existing cache
+            cursor.execute("""
+                UPDATE historical_data_cache
+                SET data_json = ?, fetched_at = ?
+                WHERE id = ?
+            """, (data_json, datetime.now().isoformat(), existing['id']))
+
+            cache_id = existing['id']
+        else:
+            # Insert new cache
+            cursor.execute("""
+                INSERT INTO historical_data_cache (
+                    protocol, asset_symbol, chain, days_back, data_json, fetched_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                protocol,
+                asset_symbol,
+                chain,
+                days_back,
+                data_json,
+                datetime.now().isoformat()
+            ))
+
+            cache_id = cursor.lastrowid
+
+        conn.commit()
+        conn.close()
+
+        return int(cache_id) # type: ignore
+
+    def get_historical_data(
+        self,
+        protocol: str,
+        asset_symbol: str,
+        chain: str,
+        days_back: int,
+        max_age_hours: int = 24
+    ) -> Optional[List[dict]]:
+        """
+        Get cached historical data if available and not stale
+
+        Args:
+            protocol: Protocol name
+            asset_symbol: Asset symbol
+            chain: Chain name
+            days_back: Number of days
+            max_age_hours: Maximum age of cache in hours (default 24)
+
+        Returns:
+            List of historical data points or None if not cached/stale
+        """
+        import json
+        from datetime import timedelta
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT data_json, fetched_at FROM historical_data_cache
+            WHERE protocol = ? AND asset_symbol = ? AND chain = ? AND days_back = ?
+        """, (protocol, asset_symbol, chain, days_back))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        # Check if cache is stale
+        fetched_at = datetime.fromisoformat(row['fetched_at'])
+        age = datetime.now() - fetched_at
+
+        if age > timedelta(hours=max_age_hours):
+            return None  # Cache is stale
+
+        # Parse and return data
+        return json.loads(row['data_json'])
+
+    def clear_historical_cache(self, older_than_days: Optional[int] = None):
+        """
+        Clear historical data cache
+
+        Args:
+            older_than_days: Only clear cache older than this many days (None = clear all)
+        """
+        from datetime import timedelta
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if older_than_days is not None:
+            cutoff = datetime.now() - timedelta(days=older_than_days)
+            cursor.execute("""
+                DELETE FROM historical_data_cache
+                WHERE fetched_at < ?
+            """, (cutoff.isoformat(),))
+        else:
+            cursor.execute("DELETE FROM historical_data_cache")
 
         conn.commit()
         conn.close()
