@@ -969,7 +969,7 @@ def render_historical_backtest_tab():
                 # Try to get cached data first
                 cached_data = None
                 if use_cache:
-                    st.info(f"🔍 Checking cache for {protocol}/{asset} on {chain}...")
+                    st.info(f"Checking cache for {protocol}/{asset} on {chain}...")
                     cached_data = db.get_historical_data(
                         protocol=protocol,
                         asset_symbol=asset,
@@ -979,11 +979,11 @@ def render_historical_backtest_tab():
                     )
 
                 if cached_data:
-                    st.success(f"✓ Using cached data ({len(cached_data)} days)")
+                    st.success(f"Using cached data ({len(cached_data)} days)")
                     historical_dicts = cached_data
                 else:
                     # Fetch fresh data
-                    st.info(f"📡 Fetching fresh data from DefiLlama API...")
+                    st.info(f"Fetching fresh data from DefiLlama API...")
                     historical = fetcher.get_historical_data_for_backtest(
                         protocol=protocol,
                         asset_symbol=asset,
@@ -992,10 +992,10 @@ def render_historical_backtest_tab():
                     )
 
                     if not historical:
-                        st.error(f"❌ Could not fetch data for {protocol}/{asset} on {chain}")
+                        st.error(f"Could not fetch data for {protocol}/{asset} on {chain}")
                         st.stop()
 
-                    st.success(f"✓ Fetched {len(historical)} days of real market data")
+                    st.success(f"Fetched {len(historical)} days of real market data")
 
                     # Convert to dicts and cache
                     historical_dicts = [h.to_dict() for h in historical]
@@ -1273,10 +1273,10 @@ def render_historical_backtest_tab():
                         unsafe_allow_html=True
                     )
 
-                st.success("✓ Historical backtest completed!")
+                st.success("Historical backtest completed!")
 
             except Exception as e:
-                st.error(f"❌ Error during backtest: {str(e)}")
+                st.error(f"Error during backtest: {str(e)}")
                 import traceback
                 st.code(traceback.format_exc())
 
