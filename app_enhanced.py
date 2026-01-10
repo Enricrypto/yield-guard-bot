@@ -1299,10 +1299,18 @@ def render_historical_backtest_tab():
                 status_text = st.empty()
 
                 # Initialize simulator
-                deposit_amount = Decimal(str(initial_capital)).quantize(Decimal('0.01'))
+                total_capital = Decimal(str(initial_capital)).quantize(Decimal('0.01'))
+
+                # Reserve capital for transaction costs
+                estimated_gas_fee = Decimal('15.00')  # ~$15 for deposit
+                estimated_protocol_fees = total_capital * Decimal('0.001')  # 0.1% buffer
+                total_reserved_costs = estimated_gas_fee + estimated_protocol_fees
+
+                # Amount available for actual deposit
+                deposit_amount = (total_capital - total_reserved_costs).quantize(Decimal('0.01'))
 
                 simulator = TreasurySimulator(
-                    initial_capital=deposit_amount,
+                    initial_capital=total_capital,
                     name=f"Historical Backtest - {protocol}/{asset}",
                     min_health_factor=Decimal('1.5')
                 )
