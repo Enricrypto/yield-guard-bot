@@ -341,7 +341,7 @@ def render_simulation_tab():
                     progress_bar.progress(1.0)
                     status_text.empty()
 
-                    st.markdown(f'<p style="color:#00c851;"><ion-icon name="checkmark-circle" style="vertical-align:middle;"></ion-icon> Simulation complete! Final value: ${final_value:,.2f} | Return: {total_return*100:.2f}%</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p style="color:#00c851;"><ion-icon name="checkmark-circle" style="vertical-align:middle;"></ion-icon> Simulation complete! Final value: {format_currency_eu(float(final_value))} | Return: {format_percentage_eu(float(total_return)*100)}</p>', unsafe_allow_html=True)
 
                     # Display per-protocol performance breakdown
                     if simulator.positions:
@@ -374,25 +374,25 @@ def render_simulation_tab():
                                 st.markdown(
                                     f"""
                                     <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_PURPLE};">
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; text-transform:uppercase; margin:0;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; text-transform:uppercase; margin:0; font-family:Space Grotesk,sans-serif; letter-spacing:0.05em;">
                                             {position.protocol.upper()}
                                         </p>
-                                        <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0;">${float(position_value):,.2f}</h2>
-                                        <p style="color:{perf_color}; margin:0; font-size:0.9rem;">
-                                            {'+' if position_return > 0 else ''}{float(position_return):.2f}% return
+                                        <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0; font-family:JetBrains Mono,monospace;">{format_currency_eu(float(position_value))}</h2>
+                                        <p style="color:{perf_color}; margin:0; font-size:0.9rem; font-family:JetBrains Mono,monospace;">
+                                            {'+' if position_return > 0 else ''}{format_percentage_eu(float(position_return))} return
                                         </p>
                                         <hr style="border:none; border-top:1px solid {colors.BG_PRIMARY}; margin:0.75rem 0;">
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
-                                            APY: {float(position_apy):.2f}%
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                            APY: {format_percentage_eu(float(position_apy))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
-                                            Collateral: ${float(position.collateral_amount):,.2f}
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                            Collateral: {format_currency_eu(float(position.collateral_amount))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
-                                            Debt: ${float(position.debt_amount):,.2f}
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                            Debt: {format_currency_eu(float(position.debt_amount))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
-                                            Health: {float(position.health_factor):.2f}
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                            Health: {format_number_eu(float(position.health_factor), 2)}
                                         </p>
                                     </div>
                                     """,
