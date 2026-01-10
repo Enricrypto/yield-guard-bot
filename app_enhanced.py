@@ -812,16 +812,17 @@ def render_dashboard_tab():
                 # Apply layout
                 fig.update_layout(
                     **layout_config,
-                    height=320,
-                    margin=dict(l=10, r=10, t=20, b=40),
+                    height=340,
+                    margin=dict(l=10, r=10, t=20, b=70),
                     showlegend=True,
                     legend=dict(
                         orientation="h",
                         yanchor="bottom",
-                        y=-0.25,
+                        y=-0.35,
                         xanchor="center",
                         x=0.5,
-                        font=dict(size=10)
+                        font=dict(size=10),
+                        bgcolor='rgba(0,0,0,0)'
                     ),
                     hovermode='x unified'
                 )
