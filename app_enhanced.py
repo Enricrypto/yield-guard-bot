@@ -780,9 +780,38 @@ def render_dashboard_tab():
                             yref='y2'
                         )
 
-                # Update layout with dual axes
+                # Get base template and update with custom settings
+                layout_config = colors.get_plotly_template()['layout'].copy()
+
+                # Update xaxis settings
+                layout_config['xaxis'].update({
+                    'title': "Day",
+                    'showgrid': True
+                })
+
+                # Update yaxis settings
+                layout_config['yaxis'].update({
+                    'title': "USD Value",
+                    'side': 'left',
+                    'showgrid': True,
+                    'tickformat': '$,.0f'
+                })
+
+                # Add secondary yaxis for health factor
+                layout_config['yaxis2'] = {
+                    'title': "Health Factor",
+                    'side': 'right',
+                    'overlaying': 'y',
+                    'showgrid': False,
+                    'tickformat': '.2f',
+                    'gridcolor': colors.BORDER_PRIMARY,
+                    'linecolor': colors.BORDER_ACCENT,
+                    'range': [0, max(hf_values) * 1.1] if any(d > 0 for d in debts) and hf_values else None
+                }
+
+                # Apply layout
                 fig.update_layout(
-                    **colors.get_plotly_template()['layout'],
+                    **layout_config,
                     height=320,
                     margin=dict(l=10, r=10, t=20, b=40),
                     showlegend=True,
@@ -794,27 +823,7 @@ def render_dashboard_tab():
                         x=0.5,
                         font=dict(size=10)
                     ),
-                    hovermode='x unified',
-                    xaxis=dict(
-                        title="Day",
-                        gridcolor='rgba(255,255,255,0.05)',
-                        showgrid=True
-                    ),
-                    yaxis=dict(
-                        title="USD Value",
-                        side='left',
-                        gridcolor='rgba(255,255,255,0.05)',
-                        showgrid=True,
-                        tickformat='$,.0f'
-                    ),
-                    yaxis2=dict(
-                        title="Health Factor",
-                        side='right',
-                        overlaying='y',
-                        showgrid=False,
-                        tickformat='.2f',
-                        range=[0, max(hf_values) * 1.1] if any(d > 0 for d in debts) and hf_values else None
-                    )
+                    hovermode='x unified'
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
