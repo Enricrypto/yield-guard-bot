@@ -1326,17 +1326,36 @@ def render_historical_backtest_tab():
                     liquidation_threshold=Decimal('0.80')
                 )
 
-                # Run simulation day by day
+                # Run simulation day by day with market volatility
                 snapshots = []
                 for day in range(len(historical)):
                     progress = (day + 1) / len(historical)
                     progress_bar.progress(progress)
                     status_text.text(f"Day {day + 1}/{len(historical)}...")
 
-                    # Update APY with real historical data
+                    # Update APY with real historical data + volatility
                     if simulator.positions:
-                        simulator.positions[0].supply_apy = historical[day].apy
-                        simulator.positions[0].borrow_apy = historical[day].apy * Decimal('1.2')
+                        base_apy = historical[day].apy
+
+                        # Add market volatility to simulate realistic price movements
+                        # Historical data shows DeFi markets have daily volatility of ±0.5-2%
+                        import random
+                        volatility_factor = Decimal(str(random.uniform(-0.02, 0.02)))  # ±2% daily
+
+                        # Apply volatility to APY (affects interest accrual)
+                        volatile_supply_apy = base_apy * (Decimal('1') + volatility_factor)
+                        volatile_borrow_apy = base_apy * Decimal('1.2') * (Decimal('1') + volatility_factor)
+
+                        # Ensure APY stays positive
+                        volatile_supply_apy = max(Decimal('0.001'), volatile_supply_apy)
+                        volatile_borrow_apy = max(Decimal('0.002'), volatile_borrow_apy)
+
+                        simulator.positions[0].supply_apy = volatile_supply_apy
+                        simulator.positions[0].borrow_apy = volatile_borrow_apy
+
+                        # Simulate collateral value fluctuation (stablecoins have minimal but non-zero volatility)
+                        collateral_volatility = Decimal(str(random.uniform(-0.005, 0.005)))  # ±0.5%
+                        simulator.positions[0].collateral_amount *= (Decimal('1') + collateral_volatility)
 
                     # Step forward
                     snapshot = simulator.step(days=Decimal('1'))
