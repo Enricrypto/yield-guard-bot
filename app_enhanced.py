@@ -663,7 +663,7 @@ def render_dashboard_tab():
             f"""
             <div class="bento-item" style="padding:1.5rem;margin-bottom:1rem;">
                 <h3 style="color:{colors.GRADIENT_BLUE};">
-                    <ion-icon name="chart-areaspline" style="vertical-align:middle;"></ion-icon>
+                    <ion-icon name="trending-up" style="vertical-align:middle;"></ion-icon>
                     Portfolio Performance
                 </h3>
             </div>
@@ -671,30 +671,174 @@ def render_dashboard_tab():
             unsafe_allow_html=True
         )
 
-        # Sample chart data (replace with actual data)
-        dates = pd.date_range(start='2024-01-01', periods=100, freq='D')
-        values = [initial_cap * (1 + i/1000) for i in range(100)]
+        # Fetch snapshot data from database for the latest simulation
+        try:
+            snapshot_query = """
+                SELECT
+                    day,
+                    net_value,
+                    total_collateral,
+                    total_debt,
+                    overall_health_factor,
+                    cumulative_yield,
+                    timestamp
+                FROM portfolio_snapshots
+                WHERE simulation_id = (SELECT id FROM simulation_runs ORDER BY created_at DESC LIMIT 1)
+                ORDER BY day ASC
+            """
+            cur.execute(snapshot_query)
+            snapshot_rows = cur.fetchall()
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=dates,
-            y=values,
-            mode='lines',
-            line=dict(color=colors.GRADIENT_PURPLE, width=3),
-            fill='tozeroy',
-            fillcolor=f'rgba(107, 95, 237, 0.1)',
-            name='Portfolio Value'
-        ))
+            if snapshot_rows and len(snapshot_rows) > 1:
+                # Extract data from snapshots
+                days = [row[0] for row in snapshot_rows]
+                net_values = [row[1] for row in snapshot_rows]
+                collaterals = [row[2] for row in snapshot_rows]
+                debts = [row[3] for row in snapshot_rows]
+                health_factors = [row[4] if row[4] is not None and row[4] != float('inf') else None for row in snapshot_rows]
 
-        fig.update_layout(
-            **colors.get_plotly_template()['layout'],
-            height=280,
-            margin=dict(l=0, r=0, t=20, b=0),
-            showlegend=False,
-            hovermode='x unified'
-        )
+                # Create figure with secondary y-axis
+                fig = go.Figure()
 
-        st.plotly_chart(fig, use_container_width=True)
+                # Add portfolio value trace (main)
+                fig.add_trace(go.Scatter(
+                    x=days,
+                    y=net_values,
+                    mode='lines',
+                    name='Net Value',
+                    line=dict(color=colors.GRADIENT_PURPLE, width=3),
+                    fill='tozeroy',
+                    fillcolor='rgba(107, 95, 237, 0.15)',
+                    hovertemplate='<b>Day %{x}</b><br>Net Value: $%{y:,.2f}<extra></extra>',
+                    yaxis='y1'
+                ))
+
+                # Add collateral trace
+                fig.add_trace(go.Scatter(
+                    x=days,
+                    y=collaterals,
+                    mode='lines',
+                    name='Collateral',
+                    line=dict(color=colors.GRADIENT_TEAL, width=2, dash='dot'),
+                    hovertemplate='<b>Day %{x}</b><br>Collateral: $%{y:,.2f}<extra></extra>',
+                    yaxis='y1'
+                ))
+
+                # Add debt trace
+                fig.add_trace(go.Scatter(
+                    x=days,
+                    y=debts,
+                    mode='lines',
+                    name='Debt',
+                    line=dict(color=colors.ACCENT_RED, width=2, dash='dash'),
+                    hovertemplate='<b>Day %{x}</b><br>Debt: $%{y:,.2f}<extra></extra>',
+                    yaxis='y1'
+                ))
+
+                # Add health factor trace on secondary axis (only if we have debt)
+                if any(d > 0 for d in debts):
+                    # Filter out None values for health factor
+                    hf_days = [d for d, hf in zip(days, health_factors) if hf is not None]
+                    hf_values = [hf for hf in health_factors if hf is not None]
+
+                    if hf_values:
+                        fig.add_trace(go.Scatter(
+                            x=hf_days,
+                            y=hf_values,
+                            mode='lines',
+                            name='Health Factor',
+                            line=dict(color=colors.ACCENT_ORANGE, width=2),
+                            hovertemplate='<b>Day %{x}</b><br>Health Factor: %{y:.2f}<extra></extra>',
+                            yaxis='y2'
+                        ))
+
+                        # Add critical health factor line at 1.0
+                        fig.add_hline(
+                            y=1.0,
+                            line=dict(color=colors.ACCENT_RED, width=1, dash='dot'),
+                            annotation_text="Liquidation Risk",
+                            annotation_position="right",
+                            yref='y2'
+                        )
+
+                # Update layout with dual axes
+                fig.update_layout(
+                    **colors.get_plotly_template()['layout'],
+                    height=320,
+                    margin=dict(l=10, r=10, t=20, b=40),
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=-0.25,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=10)
+                    ),
+                    hovermode='x unified',
+                    xaxis=dict(
+                        title="Day",
+                        gridcolor='rgba(255,255,255,0.05)',
+                        showgrid=True
+                    ),
+                    yaxis=dict(
+                        title="USD Value",
+                        side='left',
+                        gridcolor='rgba(255,255,255,0.05)',
+                        showgrid=True,
+                        tickformat='$,.0f'
+                    ),
+                    yaxis2=dict(
+                        title="Health Factor",
+                        side='right',
+                        overlaying='y',
+                        showgrid=False,
+                        tickformat='.2f',
+                        range=[0, max(hf_values) * 1.1] if any(d > 0 for d in debts) and hf_values else None
+                    )
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                # Fallback to simple placeholder if no snapshot data
+                st.markdown(
+                    f"""
+                    <div class="bento-item" style="padding:2rem;text-align:center;">
+                        <p style="color:{colors.TEXT_TERTIARY};font-size:0.9rem;">
+                            <ion-icon name="information-circle" style="vertical-align:middle;font-size:1.5rem;"></ion-icon><br>
+                            No snapshot data available. Run a simulation to see performance charts.
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        except Exception as e:
+            st.error(f"Error loading chart data: {str(e)}")
+            # Simple fallback chart
+            dates = pd.date_range(start='2024-01-01', periods=30, freq='D')
+            values = [initial_cap * (1 + i/1000) for i in range(30)]
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=dates,
+                y=values,
+                mode='lines',
+                line=dict(color=colors.GRADIENT_PURPLE, width=3),
+                fill='tozeroy',
+                fillcolor=f'rgba(107, 95, 237, 0.1)',
+                name='Portfolio Value'
+            ))
+
+            fig.update_layout(
+                **colors.get_plotly_template()['layout'],
+                height=280,
+                margin=dict(l=0, r=0, t=20, b=0),
+                showlegend=False,
+                hovermode='x unified'
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
 
     with col_right:
         st.markdown(
