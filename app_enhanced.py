@@ -744,7 +744,7 @@ def render_history_tab():
                             Avg Sharpe
                         </div>
                         <div style="font-size:1.5rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;margin-top:0.5rem;">
-                            {round(sum([r[4] for r in rows])/len(rows), 2) if rows else 0:.2f}
+                            {(sum([r[4] for r in rows])/len(rows)):.2f if rows else 0:.2f}
                         </div>
                     </div>
                     """,
