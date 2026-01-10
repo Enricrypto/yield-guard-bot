@@ -626,5 +626,214 @@ def get_custom_css() -> str:
         background-size: 200% 200%;
         animation: gradient-shift 8s ease infinite;
     }}
+
+    /* ========================================
+       MOBILE RESPONSIVE STYLES
+       ======================================== */
+
+    /* Tablets and smaller (max-width: 768px) */
+    @media (max-width: 768px) {{
+        /* Scale down headers */
+        h1 {{
+            font-size: 2rem !important;
+        }}
+
+        h2 {{
+            font-size: 1.5rem !important;
+        }}
+
+        h3 {{
+            font-size: 1rem !important;
+        }}
+
+        /* Reduce padding on main container */
+        .main .block-container {{
+            padding: 1rem !important;
+        }}
+
+        /* Bento cards - reduce padding */
+        .bento-item {{
+            padding: 1rem !important;
+            margin-bottom: 0.75rem !important;
+        }}
+
+        /* Protocol performance cards - stack vertically */
+        [data-testid="column"] {{
+            width: 100% !important;
+            min-width: 100% !important;
+        }}
+
+        /* Buttons - full width on mobile */
+        .stButton > button {{
+            width: 100% !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 0.9rem !important;
+        }}
+
+        /* Input fields - adjust sizing */
+        .stNumberInput > div > div > input,
+        .stSelectbox > div > div > div,
+        .stSlider {{
+            font-size: 0.9rem !important;
+        }}
+
+        /* Reduce margins around sections */
+        .element-container {{
+            margin-bottom: 0.75rem !important;
+        }}
+
+        /* Plotly charts - ensure they're responsive */
+        .js-plotly-plot {{
+            width: 100% !important;
+        }}
+
+        /* Sidebar - make it collapsible friendly */
+        [data-testid="stSidebar"] {{
+            min-width: 0 !important;
+        }}
+
+        /* Metric cards - adjust for mobile */
+        [data-testid="stMetric"] {{
+            padding: 1rem !important;
+        }}
+
+        [data-testid="stMetricLabel"] {{
+            font-size: 0.75rem !important;
+        }}
+
+        [data-testid="stMetricValue"] {{
+            font-size: 1.25rem !important;
+        }}
+
+        /* Tables - enable horizontal scrolling */
+        .bento-item table {{
+            display: block !important;
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+            -webkit-overflow-scrolling: touch !important;
+        }}
+
+        /* Protocol cards - reduce font sizes */
+        .bento-item h2 {{
+            font-size: 1.25rem !important;
+        }}
+
+        .bento-item p {{
+            font-size: 0.7rem !important;
+        }}
+    }}
+
+    /* Small mobile phones (max-width: 480px) */
+    @media (max-width: 480px) {{
+        /* Further reduce headers */
+        h1 {{
+            font-size: 1.5rem !important;
+            letter-spacing: -0.02em !important;
+        }}
+
+        h2 {{
+            font-size: 1.25rem !important;
+        }}
+
+        h3 {{
+            font-size: 0.9rem !important;
+        }}
+
+        /* Tighter padding everywhere */
+        .main .block-container {{
+            padding: 0.75rem !important;
+        }}
+
+        .bento-item {{
+            padding: 0.75rem !important;
+        }}
+
+        /* Buttons - slightly smaller */
+        .stButton > button {{
+            padding: 0.6rem 0.8rem !important;
+            font-size: 0.85rem !important;
+        }}
+
+        /* Protocol cards - compact layout */
+        .bento-item h2 {{
+            font-size: 1.1rem !important;
+            margin: 0.25rem 0 !important;
+        }}
+
+        .bento-item p {{
+            font-size: 0.65rem !important;
+            margin: 0.15rem 0 !important;
+        }}
+
+        /* Hide long labels, show abbreviations if possible */
+        .stNumberInput label {{
+            font-size: 0.8rem !important;
+        }}
+
+        /* Reduce icon sizes */
+        ion-icon {{
+            font-size: 1rem !important;
+        }}
+
+        /* Chart legends - smaller */
+        .js-plotly-plot .legend {{
+            font-size: 0.65rem !important;
+        }}
+
+        /* Table text - smaller on tiny screens */
+        .bento-item table {{
+            font-size: 0.7rem !important;
+        }}
+
+        .bento-item table th,
+        .bento-item table td {{
+            padding: 0.4rem !important;
+        }}
+    }}
+
+    /* Landscape mobile (max-height: 500px and orientation: landscape) */
+    @media (max-height: 500px) and (orientation: landscape) {{
+        /* Reduce vertical spacing */
+        .main .block-container {{
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+        }}
+
+        .bento-item {{
+            padding: 0.75rem !important;
+            margin-bottom: 0.5rem !important;
+        }}
+
+        h1 {{
+            font-size: 1.5rem !important;
+            margin-bottom: 0.25rem !important;
+        }}
+
+        h2 {{
+            font-size: 1.25rem !important;
+            margin-bottom: 0.25rem !important;
+        }}
+    }}
+
+    /* Ensure images and charts are responsive */
+    @media (max-width: 768px) {{
+        img {{
+            max-width: 100% !important;
+            height: auto !important;
+        }}
+
+        /* Force plotly charts to respect container width */
+        .plotly-graph-div {{
+            width: 100% !important;
+        }}
+
+        /* Protocol breakdown cards - allow text wrapping on mobile */
+        .bento-item h2,
+        .bento-item p {{
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+        }}
+    }}
     </style>
     """
