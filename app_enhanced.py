@@ -736,6 +736,7 @@ def render_history_tab():
                 )
 
             with col2:
+                avg_sharpe = (sum([r[4] for r in rows])/len(rows)) if rows else 0
                 st.markdown(
                     f"""
                     <div class="bento-item" style="padding:1.5rem;margin-top:1rem;">
@@ -744,7 +745,7 @@ def render_history_tab():
                             Avg Sharpe
                         </div>
                         <div style="font-size:1.5rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;margin-top:0.5rem;">
-                            {(sum([r[4] for r in rows])/len(rows)):.2f if rows else 0:.2f}
+                            {avg_sharpe:.2f}
                         </div>
                     </div>
                     """,
