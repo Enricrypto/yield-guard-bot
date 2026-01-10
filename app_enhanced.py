@@ -456,22 +456,22 @@ def render_simulation_tab():
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; text-transform:uppercase; margin:0; font-family:Space Grotesk,sans-serif; letter-spacing:0.05em;">
                                             {position.protocol.upper()}
                                         </p>
-                                        <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0; font-family:JetBrains Mono,monospace;">{format_currency_eu(float(position_value))}</h2>
-                                        <p style="color:{perf_color}; margin:0; font-size:0.9rem; font-family:JetBrains Mono,monospace;">
+                                        <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0; font-family:JetBrains Mono,monospace; font-size:1.5rem; white-space:nowrap;">{format_currency_eu(float(position_value))}</h2>
+                                        <p style="color:{perf_color}; margin:0; font-size:0.85rem; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             {'+' if position_return > 0 else ''}{format_percentage_eu(float(position_return))} return
                                         </p>
                                         <hr style="border:none; border-top:1px solid {colors.BG_PRIMARY}; margin:0.75rem 0;">
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             APY: {format_percentage_eu(float(position_apy))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             Collateral: {format_currency_eu(float(position.collateral_amount))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             Debt: {format_currency_eu(float(position.debt_amount))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0; font-family:JetBrains Mono,monospace;">
-                                            Health: {format_number_eu(float(position.health_factor), 2)}
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            Health: {format_number_eu(float(position.health_factor), 2) if position.health_factor != Decimal('Infinity') else '∞'}
                                         </p>
                                     </div>
                                     """,
