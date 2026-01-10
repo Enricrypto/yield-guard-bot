@@ -189,13 +189,8 @@ def render_simulation_tab():
                         st.markdown('<p style="color:#ff4b4b;"><ion-icon name="warning" style="vertical-align:middle;"></ion-icon> Please select at least one protocol</p>', unsafe_allow_html=True)
                         st.stop()
 
-                    # Map risk tolerance to strategy name
-                    strategy_map = {
-                        "Conservative": "Conservative",
-                        "Moderate": "Balanced",
-                        "Aggressive": "High Yield"
-                    }
-                    strategy_name = strategy_map[risk_tolerance]
+                    # Use risk tolerance as strategy name directly
+                    strategy_name = risk_tolerance
 
                     # Initialize simulator
                     simulator = TreasurySimulator(
