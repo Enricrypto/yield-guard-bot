@@ -445,13 +445,21 @@ def render_simulation_tab():
                                 # Determine color based on performance
                                 perf_color = colors.SUCCESS if position_return > 0 else colors.ERROR if position_return < 0 else colors.TEXT_SECONDARY
 
+                                # Responsive font sizing based on value magnitude
+                                if position_value >= 100000:
+                                    value_font_size = "1.15rem"
+                                elif position_value >= 50000:
+                                    value_font_size = "1.3rem"
+                                else:
+                                    value_font_size = "1.5rem"
+
                                 st.markdown(
                                     f"""
                                     <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_PURPLE};">
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; text-transform:uppercase; margin:0; font-family:Space Grotesk,sans-serif; letter-spacing:0.05em;">
                                             {position.protocol.upper()}
                                         </p>
-                                        <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0; font-family:JetBrains Mono,monospace; font-size:1.5rem; white-space:nowrap;">{format_currency_eu(float(position_value))}</h2>
+                                        <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0; font-family:JetBrains Mono,monospace; font-size:{value_font_size}; white-space:nowrap;">{format_currency_eu(float(position_value))}</h2>
                                         <p style="color:{perf_color}; margin:0; font-size:0.85rem; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             {'+' if position_return > 0 else ''}{format_percentage_eu(float(position_return))} return
                                         </p>
