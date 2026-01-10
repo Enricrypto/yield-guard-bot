@@ -344,7 +344,7 @@ def render_simulation_tab():
                         for idx, position in enumerate(simulator.positions):
                             with cols[idx]:
                                 # Calculate position-specific metrics
-                                position_value = position.collateral - position.debt
+                                position_value = position.collateral_amount - position.debt_amount
                                 initial_position_value = (total_capital / num_protocols).quantize(Decimal('0.01'))
                                 position_return = ((position_value - initial_position_value) / initial_position_value) * 100
                                 position_apy = position.supply_apy * 100
@@ -367,10 +367,10 @@ def render_simulation_tab():
                                             APY: {float(position_apy):.2f}%
                                         </p>
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
-                                            Collateral: ${float(position.collateral):,.2f}
+                                            Collateral: ${float(position.collateral_amount):,.2f}
                                         </p>
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
-                                            Debt: ${float(position.debt):,.2f}
+                                            Debt: ${float(position.debt_amount):,.2f}
                                         </p>
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.8rem; margin:0;">
                                             Health: {float(position.health_factor):.2f}
