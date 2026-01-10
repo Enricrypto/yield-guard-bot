@@ -761,6 +761,7 @@ def render_history_tab():
             col1, col2, col3 = st.columns(3)
 
             with col1:
+                best_return = max([r[3] for r in rows])*100
                 st.markdown(
                     f"""
                     <div class="bento-item" style="padding:1.5rem;margin-top:1rem;">
@@ -769,7 +770,7 @@ def render_history_tab():
                             Best Return
                         </div>
                         <div style="font-size:1.5rem;color:{colors.GRADIENT_TEAL};font-family:JetBrains Mono,monospace;margin-top:0.5rem;">
-                            {max([r[3] for r in rows])*100:+.2f}%
+                            {'+' if best_return >= 0 else ''}{format_percentage_eu(best_return)}
                         </div>
                     </div>
                     """,
@@ -778,6 +779,8 @@ def render_history_tab():
 
             with col2:
                 avg_sharpe = (sum([r[4] for r in rows])/len(rows)) if rows else 0
+                # Clamp to reasonable range
+                avg_sharpe = min(max(avg_sharpe, -10), 10)
                 st.markdown(
                     f"""
                     <div class="bento-item" style="padding:1.5rem;margin-top:1rem;">
@@ -786,7 +789,7 @@ def render_history_tab():
                             Avg Sharpe
                         </div>
                         <div style="font-size:1.5rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;margin-top:0.5rem;">
-                            {avg_sharpe:.2f}
+                            {format_number_eu(avg_sharpe, 2)}
                         </div>
                     </div>
                     """,
