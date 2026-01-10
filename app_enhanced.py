@@ -462,6 +462,9 @@ def render_simulation_tab():
                                         </p>
                                         <hr style="border:none; border-top:1px solid {colors.BG_PRIMARY}; margin:0.75rem 0;">
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            Initial: {format_currency_eu(float(initial_position_value))}
+                                        </p>
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             APY: {format_percentage_eu(float(position_apy))}
                                         </p>
                                         <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
