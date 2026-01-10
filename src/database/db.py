@@ -25,6 +25,8 @@ class SimulationRun:
     created_at: datetime
     total_gas_fees: float = 0.0
     num_rebalances: int = 0
+    sortino_ratio: float = 0.0
+    win_rate: float = 0.0
     id: Optional[int] = None
 
 
@@ -146,6 +148,17 @@ class DatabaseManager:
             ON historical_data_cache(protocol, asset_symbol, chain, days_back)
         """)
 
+        # Migration: Add sortino_ratio and win_rate columns if they don't exist
+        try:
+            cursor.execute("ALTER TABLE simulation_runs ADD COLUMN sortino_ratio REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE simulation_runs ADD COLUMN win_rate REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
 
@@ -167,8 +180,8 @@ class DatabaseManager:
                 strategy_name, initial_capital, simulation_days,
                 protocols_used, total_return, annualized_return,
                 max_drawdown, sharpe_ratio, final_value, total_gas_fees,
-                num_rebalances, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                num_rebalances, sortino_ratio, win_rate, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             simulation.strategy_name,
             simulation.initial_capital,
@@ -181,6 +194,8 @@ class DatabaseManager:
             simulation.final_value,
             simulation.total_gas_fees,
             simulation.num_rebalances,
+            simulation.sortino_ratio,
+            simulation.win_rate,
             simulation.created_at
         ))
 

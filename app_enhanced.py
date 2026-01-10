@@ -331,9 +331,21 @@ def render_simulation_tab():
                             sharpe = Decimal('0')
                         elif abs(float(sharpe)) > 10:  # Cap extremely high values
                             sharpe = Decimal('0')
+
+                        # Calculate Sortino ratio (downside risk-adjusted)
+                        sortino = metrics.calculate_sortino_ratio(daily_returns, annualize=True)
+                        if sortino == Decimal('Infinity') or sortino == Decimal('-Infinity'):
+                            sortino = Decimal('0')
+                        elif abs(float(sortino)) > 10:
+                            sortino = Decimal('0')
+
+                        # Calculate Win Rate (% of profitable days)
+                        win_rate = metrics.calculate_win_rate(daily_returns)
                     else:
-                        # Not enough data for meaningful Sharpe ratio
+                        # Not enough data for meaningful metrics
                         sharpe = Decimal('0')
+                        sortino = Decimal('0')
+                        win_rate = Decimal('0')
 
                     # Save to database
                     db = DatabaseManager(st.session_state.config.database_path)
@@ -351,6 +363,8 @@ def render_simulation_tab():
                         final_value=float(final_value),
                         total_gas_fees=float(simulator.total_gas_fees),
                         num_rebalances=simulator.num_transactions,  # Track total transactions for now
+                        sortino_ratio=float(sortino),
+                        win_rate=float(win_rate),
                         created_at=datetime.now()
                     )
 
