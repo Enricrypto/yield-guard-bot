@@ -720,8 +720,7 @@ def render_history_tab():
             # Build HTML table with full control
             table_rows = ""
             for _, row in df.iterrows():
-                table_rows += f"""
-                <tr>
+                table_rows += f"""<tr>
                     <td>{row['ID']}</td>
                     <td>{row['Initial Capital']}</td>
                     <td>{row['Final Value']}</td>
@@ -730,8 +729,7 @@ def render_history_tab():
                     <td>{row['Max Drawdown']}</td>
                     <td>{row['Rebalances']}</td>
                     <td>{row['Date']}</td>
-                </tr>
-                """
+                </tr>"""
 
             st.markdown(
                 f"""
