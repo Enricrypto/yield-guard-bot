@@ -248,7 +248,15 @@ def render_simulation_tab():
                     progress_bar = st.progress(0)
                     status_text = st.empty()
 
-                    # Run simulation with progress updates
+                    # Determine volatility level based on risk tier
+                    volatility_levels = {
+                        'Conservative': 'low',     # ±0.2-0.5% APY variation
+                        'Moderate': 'medium',      # ±0.5-1.5% APY variation
+                        'Aggressive': 'high'       # ±1-3% APY variation
+                    }
+                    volatility_level = volatility_levels.get(strategy_name, 'low')
+
+                    # Run simulation with progress updates and market volatility
                     snapshots = []
                     for day in range(simulation_days):
                         # Update progress
@@ -256,8 +264,26 @@ def render_simulation_tab():
                         progress_bar.progress(progress)
                         status_text.text(f"Simulating day {day + 1}/{simulation_days}...")
 
-                        # Simulate one day
-                        snapshot = simulator.step(days=Decimal('1'))
+                        # Generate market volatility for this day
+                        market_data = {}
+                        for position in simulator.positions:
+                            if position.protocol not in market_data:
+                                market_data[position.protocol] = {}
+
+                            # Generate APY fluctuations
+                            new_rates = simulator._generate_market_volatility(
+                                position.supply_apy,
+                                position.borrow_apy,
+                                volatility_level
+                            )
+
+                            market_data[position.protocol][position.asset_symbol] = {
+                                'supply_apy': new_rates['supply_apy'],
+                                'borrow_apy': new_rates['borrow_apy']
+                            }
+
+                        # Simulate one day with market data
+                        snapshot = simulator.step(days=Decimal('1'), market_data=market_data)
                         snapshots.append(snapshot)
 
                     # Calculate performance metrics

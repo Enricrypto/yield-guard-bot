@@ -9,6 +9,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 import copy
+import random
 
 from .position import Position
 
@@ -155,6 +156,54 @@ class TreasurySimulator:
             'protocol_fee': protocol_fee,
             'slippage': slippage,
             'total_cost': total_cost
+        }
+
+    def _generate_market_volatility(
+        self,
+        base_supply_apy: Decimal,
+        base_borrow_apy: Decimal,
+        volatility_level: str = 'low'
+    ) -> Dict[str, Decimal]:
+        """
+        Generate realistic APY fluctuations for stablecoin lending markets
+
+        Args:
+            base_supply_apy: Base supply APY rate
+            base_borrow_apy: Base borrow APY rate
+            volatility_level: 'low', 'medium', or 'high'
+
+        Returns:
+            Dictionary with supply_apy and borrow_apy for this step
+        """
+        # Stablecoin lending markets have low volatility
+        # APY rates fluctuate based on utilization and market conditions
+        volatility_ranges = {
+            'low': (Decimal('0.002'), Decimal('0.005')),      # ±0.2% to ±0.5% daily variation
+            'medium': (Decimal('0.005'), Decimal('0.015')),   # ±0.5% to ±1.5% daily variation
+            'high': (Decimal('0.01'), Decimal('0.03'))        # ±1% to ±3% daily variation
+        }
+
+        min_var, max_var = volatility_ranges.get(volatility_level, volatility_ranges['low'])
+
+        # Random walk with mean reversion
+        # APY tends to revert to base rate over time
+        supply_variation = Decimal(str(random.uniform(float(-max_var), float(max_var))))
+        borrow_variation = Decimal(str(random.uniform(float(-max_var), float(max_var))))
+
+        new_supply_apy = base_supply_apy + supply_variation
+        new_borrow_apy = base_borrow_apy + borrow_variation
+
+        # Ensure rates stay positive and realistic
+        new_supply_apy = max(Decimal('0.001'), min(new_supply_apy, Decimal('0.20')))  # 0.1% to 20%
+        new_borrow_apy = max(Decimal('0.002'), min(new_borrow_apy, Decimal('0.25')))  # 0.2% to 25%
+
+        # Borrow rate should always be higher than supply rate
+        if new_borrow_apy <= new_supply_apy:
+            new_borrow_apy = new_supply_apy + Decimal('0.01')
+
+        return {
+            'supply_apy': new_supply_apy,
+            'borrow_apy': new_borrow_apy
         }
 
     def deposit(
