@@ -341,7 +341,15 @@ def render_simulation_tab():
                     progress_bar.progress(1.0)
                     status_text.empty()
 
-                    st.markdown(f'<p style="color:#00c851;"><ion-icon name="checkmark-circle" style="vertical-align:middle;"></ion-icon> Simulation complete! Final value: {format_currency_eu(float(final_value))} | Return: {format_percentage_eu(float(total_return)*100)}</p>', unsafe_allow_html=True)
+                    # Determine risk color
+                    risk_colors = {
+                        'Conservative': colors.GRADIENT_TEAL,
+                        'Moderate': colors.GRADIENT_ORANGE,
+                        'Aggressive': colors.ACCENT_RED
+                    }
+                    risk_color = risk_colors.get(strategy_name, colors.GRADIENT_PURPLE)
+
+                    st.markdown(f'<p style="color:#00c851;"><ion-icon name="checkmark-circle" style="vertical-align:middle;"></ion-icon> Simulation complete! <span style="color:{risk_color}; font-weight:700;">[{strategy_name} Risk]</span> | Final value: {format_currency_eu(float(final_value))} | Return: {format_percentage_eu(float(total_return)*100)}</p>', unsafe_allow_html=True)
 
                     # Display transaction costs summary
                     st.markdown(
@@ -1498,7 +1506,10 @@ def render_landing_page():
                 </div>
                 <div style="background:{colors.BG_PRIMARY};padding:1.5rem;border-radius:12px;border:1px solid {colors.BORDER_PRIMARY};">
                     <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;">Avg Sharpe</div>
-                    <div style="font-size:2rem;color:{colors.GRADIENT_TEAL};font-family:JetBrains Mono,monospace;margin-top:0.5rem;">{avg_sharpe:.2f}</div>
+                    <div style="font-size:2rem;color:{colors.GRADIENT_TEAL};font-family:JetBrains Mono,monospace;margin-top:0.5rem;">{format_number_eu(avg_sharpe, 2)}</div>
+                    <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:0.5rem;font-style:italic;">
+                        {'Low volatility simulations' if avg_sharpe == 0 else 'Risk-adjusted performance'}
+                    </div>
                 </div>
             </div>
         </div>
