@@ -687,6 +687,10 @@ def render_dashboard_tab():
 
         # Fetch snapshot data from database for the latest simulation
         try:
+            # Open new database connection for chart data
+            chart_conn = get_db_connection()
+            chart_cur = chart_conn.cursor()
+
             snapshot_query = """
                 SELECT
                     day,
@@ -700,8 +704,9 @@ def render_dashboard_tab():
                 WHERE simulation_id = (SELECT id FROM simulation_runs ORDER BY created_at DESC LIMIT 1)
                 ORDER BY day ASC
             """
-            cur.execute(snapshot_query)
-            snapshot_rows = cur.fetchall()
+            chart_cur.execute(snapshot_query)
+            snapshot_rows = chart_cur.fetchall()
+            chart_conn.close()
 
             if snapshot_rows and len(snapshot_rows) > 1:
                 # Extract data from snapshots
