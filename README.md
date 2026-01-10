@@ -70,6 +70,61 @@ streamlit run app_enhanced.py
 
 The interactive dashboard will open in your browser at `http://localhost:8501`
 
+---
+
+## 📱 Using the Dashboard
+
+### Navigation Tabs
+
+The dashboard features 5 main tabs:
+
+1. **RUN SIMULATION** - Configure and execute portfolio simulations
+2. **DASHBOARD** - View performance metrics and charts
+3. **HISTORICAL BACKTEST** - Backtest strategies with real DeFi market data
+4. **HISTORY** - Browse past simulation results
+5. **ABOUT** - Project information and documentation
+
+### Understanding Dashboard Metrics
+
+All metrics in the Dashboard tab include **tooltip explanations**. Simply **hover over the (?) icon** next to any metric to see:
+
+| Metric | What It Means | Tooltip Shows |
+|--------|---------------|---------------|
+| **Portfolio Value** | Current total value | "Your current total portfolio value including all positions, collateral, and debt." |
+| **P&L** | Profit & Loss | "Total gain or loss as percentage and dollar amount. Calculated as (Final - Initial) / Initial." |
+| **Sharpe Ratio** | Risk-adjusted return | "Measures return per unit of risk. >1.0 = Good, >1.5 = Very Good, >2.0 = Excellent." |
+| **Max Drawdown** | Worst temporary loss | "Largest peak-to-trough decline. Shows worst loss experienced. Lower is better." |
+
+### Running a Simulation
+
+1. Go to **"RUN SIMULATION"** tab
+2. Set parameters:
+   - Initial Capital: $100 - $10M
+   - Duration: 30-365 days
+   - Risk: Conservative / Moderate / Aggressive
+   - Protocols: Aave, Morpho, Compound
+3. Click **"RUN SIMULATION"**
+4. View results:
+   - Overall performance metrics
+   - **Per-protocol breakdown** (NEW!)
+   - Portfolio value charts
+5. Check **Dashboard** tab for detailed analytics
+
+### Historical Backtesting
+
+1. Go to **"HISTORICAL BACKTEST"** tab
+2. Configure:
+   - Protocol: aave-v3, compound-v3
+   - Asset: USDC, USDT, DAI, WETH, WBTC
+   - Chain: Ethereum, Polygon, Arbitrum, etc.
+   - Time Period: 30 days to 1 year
+3. Enable **"Use cached data"** for faster runs
+4. Click **"RUN HISTORICAL BACKTEST"**
+5. Analyze:
+   - Real APY rates from market
+   - Actual performance metrics
+   - Portfolio vs APY charts
+
 ### Run Command-Line Simulations
 
 ```bash
