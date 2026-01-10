@@ -571,18 +571,18 @@ def render_dashboard_tab():
 
     with col1:
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="wallet" style="vertical-align:middle;"></ion-icon>
                 Portfolio Value
             </div>
-            <div style="font-size:2rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;">
+            <div style="font-size:2rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;line-height:1.2;">
                 {format_currency_eu(final_val)}
             </div>
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Initial: {format_currency_eu(initial_cap)}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
                 Total value including positions, collateral & debt
             </div>
         </div>
@@ -593,18 +593,18 @@ def render_dashboard_tab():
         pnl_color = colors.GRADIENT_TEAL if pnl >= 0 else colors.ACCENT_RED
         pnl_icon = "trending-up" if pnl >= 0 else "trending-down"
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="{pnl_icon}" style="vertical-align:middle;"></ion-icon>
                 P&L
             </div>
-            <div style="font-size:2rem;color:{pnl_color};font-family:JetBrains Mono,monospace;">
+            <div style="font-size:2rem;color:{pnl_color};font-family:JetBrains Mono,monospace;line-height:1.2;">
                 {'+' if pnl >= 0 else ''}{format_percentage_eu(pnl_pct)}
             </div>
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 {'+' if pnl >= 0 else ''}{format_currency_eu(abs(pnl))}
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
                 (Final - Initial) / Initial Capital
             </div>
         </div>
@@ -615,18 +615,18 @@ def render_dashboard_tab():
         # Clamp Sharpe to reasonable values
         sharpe_clamped = min(max(float(sharpe), -10), 10)
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="analytics" style="vertical-align:middle;"></ion-icon>
                 Sharpe Ratio
             </div>
-            <div style="font-size:2rem;color:{colors.GRADIENT_TEAL};font-family:JetBrains Mono,monospace;">
+            <div style="font-size:2rem;color:{colors.GRADIENT_TEAL};font-family:JetBrains Mono,monospace;line-height:1.2;">
                 {format_number_eu(sharpe_clamped, 2)}
             </div>
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Risk-adjusted return
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
                 >1,0 Good, >1,5 Very Good, >2,0 Excellent
             </div>
         </div>
@@ -635,18 +635,18 @@ def render_dashboard_tab():
 
     with col4:
         metric_card_html = f"""
-        <div class="bento-item" style="padding:1.5rem; min-height:180px; display:flex; flex-direction:column;">
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
                 <ion-icon name="alert-circle" style="vertical-align:middle;"></ion-icon>
                 Max Drawdown
             </div>
-            <div style="font-size:2rem;color:{colors.GRADIENT_ORANGE};font-family:JetBrains Mono,monospace;">
+            <div style="font-size:2rem;color:{colors.GRADIENT_ORANGE};font-family:JetBrains Mono,monospace;line-height:1.2;">
                 {format_percentage_eu(drawdown)}
             </div>
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
                 Peak to trough
             </div>
-            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
                 Largest drop from high to low. Lower is better
             </div>
         </div>
