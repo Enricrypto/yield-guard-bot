@@ -254,7 +254,13 @@ class PerformanceMetrics:
         downside_dev = Decimal(str(math.sqrt(float(downside_variance))))
 
         if downside_dev == 0:
-            return Decimal('0')
+            # No downside risk - this is excellent!
+            # Return a high but finite value instead of infinity
+            # If mean return > risk-free rate, return max value, else 0
+            if mean_return > daily_rf_rate:
+                return Decimal('10.0')  # Cap at 10 (excellent Sortino)
+            else:
+                return Decimal('0')
 
         # Sortino ratio
         sortino = (mean_return - daily_rf_rate) / downside_dev  # type: ignore[operator]
@@ -312,6 +318,57 @@ class PerformanceMetrics:
             return Decimal('0')
 
         return Decimal(winning_periods) / Decimal(total_periods)
+
+    def calculate_metrics_from_index(
+        self,
+        index_values: List[Decimal],
+        initial_capital: Decimal,
+        days: Optional[int] = None
+    ) -> Dict:
+        """
+        Calculate performance metrics from share price index history
+        This is the TRUE Time-Weighted Return (TWR) calculation
+
+        Args:
+            index_values: Time series of share price index (starts at 1.0)
+            initial_capital: Initial investment amount
+            days: Number of days (inferred from index_values if not provided)
+
+        Returns:
+            Dictionary with all metrics calculated from index
+        """
+        if not index_values or len(index_values) < 2:
+            return self._empty_metrics()
+
+        # Infer days if not provided
+        if days is None:
+            days = len(index_values) - 1
+
+        # Calculate portfolio values from index
+        # If you deposited $100k and index goes 1.0 → 1.05, your value = $105k
+        portfolio_values = [initial_capital * idx for idx in index_values]
+
+        # Calculate returns from index evolution (this is TWR)
+        returns = []
+        for i in range(1, len(index_values)):
+            if index_values[i - 1] > 0:
+                # Index return = (index_t / index_t-1) - 1
+                daily_return = (index_values[i] / index_values[i - 1]) - Decimal('1')
+                returns.append(daily_return)
+            else:
+                returns.append(Decimal('0'))
+
+        # Calculate metrics using standard method
+        result = self.calculate_all_metrics(portfolio_values, returns, days)
+
+        # Add index-specific metadata
+        result['index_based'] = True
+        result['initial_index'] = float(index_values[0])
+        result['final_index'] = float(index_values[-1])
+        result['index_return'] = float(index_values[-1] / index_values[0] - Decimal('1'))
+        result['index_return_pct'] = float((index_values[-1] / index_values[0] - Decimal('1')) * 100)
+
+        return result
 
     def calculate_all_metrics(
         self,
@@ -417,6 +474,71 @@ class PerformanceMetrics:
             'num_returns': 0,
             'risk_free_rate': 0,
             'risk_free_rate_pct': 0,
+        }
+
+    def calculate_rolling_apy(
+        self,
+        index_values: List[Decimal],
+        window_days: int
+    ) -> Decimal:
+        """
+        Calculate rolling APY from recent index performance
+        This shows recent performance, not forward-looking promises
+
+        Args:
+            index_values: Time series of share price index
+            window_days: Lookback window (e.g., 7, 30, 90 days)
+
+        Returns:
+            Rolling APY as decimal (0.05 = 5%)
+        """
+        if len(index_values) < window_days + 1:
+            # Not enough data for full window
+            window_days = len(index_values) - 1
+
+        if window_days <= 0:
+            return Decimal('0')
+
+        # Get index at start and end of window
+        index_start = index_values[-(window_days + 1)]
+        index_end = index_values[-1]
+
+        if index_start <= 0:
+            return Decimal('0')
+
+        # Calculate return over window
+        period_return = (index_end / index_start) - Decimal('1')
+
+        # Annualize: (1 + return)^(365/days) - 1
+        growth_factor = Decimal('1') + period_return
+        years = Decimal(window_days) / Decimal('365')
+
+        if growth_factor <= 0:
+            return Decimal('-1')  # Total loss
+
+        import math
+        apy = Decimal(str(math.pow(float(growth_factor), float(Decimal('1') / years)))) - Decimal('1')
+
+        return apy
+
+    def calculate_multiple_rolling_apys(
+        self,
+        index_values: List[Decimal]
+    ) -> Dict[str, Decimal]:
+        """
+        Calculate 7d, 30d, and 90d rolling APYs
+        Like Yearn/Beefy dashboards
+
+        Args:
+            index_values: Time series of share price index
+
+        Returns:
+            Dictionary with 7d_apy, 30d_apy, 90d_apy
+        """
+        return {
+            '7d_apy': self.calculate_rolling_apy(index_values, 7),
+            '30d_apy': self.calculate_rolling_apy(index_values, 30),
+            '90d_apy': self.calculate_rolling_apy(index_values, 90),
         }
 
     def compare_strategies(

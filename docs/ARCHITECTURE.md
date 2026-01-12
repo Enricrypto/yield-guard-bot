@@ -673,20 +673,286 @@ Test Categories:
 
 ---
 
+## 🚨 Phase 5: Source of Truth Layer (NEW - 2026-01-11)
+
+### Problem Identified
+
+**ChatGPT Code Review Feedback:**
+> ⚠️ Architectural smell: mixed responsibilities
+> Currently: Strategy logic, Analytics logic, Visualization logic...sometimes bleed into each other.
+> ❌ Missing 'source of truth' layer
+> You need a clear hierarchy: Raw protocol data → Normalized metrics → Strategy decisions → Performance analytics → UI
+
+### Solution: Establish Clear Data Hierarchy
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 5: UI / Visualization (app_enhanced.py)                 │
+│ Responsibility: Display data ONLY, no calculations            │
+└────────────────────────────────────────────────────────────────┘
+                            ▲
+                            │ (reads from)
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 4: Performance Analytics (src/analytics/)               │
+│ Responsibility: Calculate metrics, benchmarks, risk analysis  │
+│ Source of Truth: Performance metrics                          │
+└────────────────────────────────────────────────────────────────┘
+                            ▲
+                            │ (reads from)
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 3: Strategy Logic (src/simulator/)                      │
+│ Responsibility: Execute trades, manage positions              │
+│ Source of Truth: Position state, portfolio value, index       │
+└────────────────────────────────────────────────────────────────┘
+                            ▲
+                            │ (reads from)
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 2: Normalized Metrics (src/market_data/)                │
+│ Responsibility: Clean, validate, normalize raw data           │
+│ Source of Truth: Quality-assured protocol rates               │
+└────────────────────────────────────────────────────────────────┘
+                            ▲
+                            │ (reads from)
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 1: Raw Protocol Data (src/protocols/)                   │
+│ Responsibility: Fetch from external APIs                      │
+│ Source of Truth: Unmodified protocol responses                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Layer Responsibilities & Rules
+
+#### Layer 1: Raw Protocol Data
+**Files:** `src/protocols/*_fetcher.py`
+- ✅ Fetch raw data from DeFi protocols
+- ✅ Cache responses with timestamps
+- ✅ Return unmodified API responses
+- ❌ NO transformations, calculations, or business logic
+
+#### Layer 2: Normalized Metrics
+**Files:** `src/market_data/data_quality.py`, `src/market_data/normalized_rates.py`
+- ✅ Validate data quality (staleness, anomalies)
+- ✅ Smooth volatile rates (EMA, capping)
+- ✅ Convert to standard formats (Decimal percentages)
+- ✅ Score confidence (0-1 based on data quality)
+- ❌ NO strategy decisions or position management
+- ❌ NO performance calculations
+
+**Implemented (Phase 4):**
+- `DataQualityChecker` - Staleness detection, anomaly detection, confidence scoring
+- `RateSmoother` - EMA smoothing, rate change capping
+
+#### Layer 3: Strategy Logic
+**Files:** `src/simulator/treasury_simulator.py`, `src/simulator/position.py`
+- ✅ Manage positions (deposits, borrows, harvests)
+- ✅ Execute discrete events (harvest every N days)
+- ✅ Track share price index (vault accounting)
+- ✅ Calculate position-level metrics (health factor, LTV)
+- ✅ Track real-time risk (peak value, drawdowns)
+- ❌ NO data fetching or cleaning
+- ❌ NO performance analytics (Sharpe, alpha, etc.)
+- ❌ NO UI rendering
+
+**Source of Truth:**
+- `Position.share_price_index` - Current index value (starts at 1.0)
+- `Position.realized_yield` - Harvested gains reflected in index
+- `Position.unrealized_yield` - Pending gains before harvest
+- `TreasurySimulator.peak_value` - Running peak for drawdown calculation
+- `TreasurySimulator.max_drawdown` - Worst drawdown experienced
+
+#### Layer 4: Performance Analytics
+**Files:** `src/analytics/performance_metrics.py`, `src/analytics/benchmarks.py`
+- ✅ Calculate TWR from share price index history
+- ✅ Calculate risk metrics (Sharpe, Sortino, Calmar)
+- ✅ Compare to benchmarks (alpha, information ratio)
+- ✅ Analyze drawdowns and worst losses
+- ❌ NO position management
+- ❌ NO data fetching or normalization
+- ❌ NO UI rendering
+
+**Source of Truth:**
+- `PerformanceMetrics.calculate_metrics_from_index()` - True TWR calculation
+- `BenchmarkProvider.BENCHMARKS` - Canonical benchmark definitions
+- `PerformanceComparator.generate_comparison_report()` - Comparative analysis
+
+#### Layer 5: UI / Visualization
+**Files:** `app_enhanced.py`
+- ✅ Render Streamlit dashboard components
+- ✅ Handle user inputs (sliders, buttons)
+- ✅ Format data for display (percentages, currency)
+- ✅ Trigger simulations via button clicks
+- ❌ NO calculations (use Layer 4)
+- ❌ NO data fetching (use Layer 2)
+- ❌ NO position management (use Layer 3)
+
+### Data Flow Example: Complete Simulation
+
+```
+1. User Input (Layer 5)
+   User clicks "Run Simulation" with parameters
+   ↓
+2. Layer 5 → Layer 3
+   app_enhanced.py calls TreasurySimulator.run_simulation()
+   ↓
+3. Layer 3 → Layer 2
+   TreasurySimulator needs protocol rates
+   Calls normalized_rates.get_quality_assured_data()
+   ↓
+4. Layer 2 → Layer 1
+   normalized_rates calls aave_fetcher.fetch_reserve_data()
+   ↓
+5. Layer 1 → External API
+   aave_fetcher makes HTTP request to Aave API
+   Returns RawProtocolData(supply_rate_raw="0.045", ...)
+   ↓
+6. Layer 2 Processing
+   DataQualityChecker.assess_data_quality(raw_data)
+   - Check staleness (< 1 hour)
+   - Detect anomalies (> 3x std dev)
+   - Score confidence (0-1)
+   RateSmoother.smooth_and_cap(rates)
+   - EMA smoothing (7-day window)
+   - Cap changes (50% max per period)
+   Returns NormalizedProtocolData(supply_apy=Decimal('0.045'), confidence=0.87)
+   ↓
+7. Layer 3 Execution
+   TreasurySimulator.deposit(protocol='aave', amount=10000, supply_apy=0.045)
+   Creates Position(collateral_amount=10000, share_price_index=1.0)
+
+   FOR day in 1..180:
+       Position.accrue_yield()  # Accumulate to pending_yield
+       IF day % harvest_frequency == 0:
+           Position.harvest()  # Crystallize into share_price_index
+       Track peak_value, current_drawdown, max_drawdown
+
+   Returns snapshots with index history
+   ↓
+8. Layer 4 Analysis
+   PerformanceMetrics.calculate_metrics_from_index(index_history)
+   - Calculate TWR: (final_index / initial_index) - 1
+   - Calculate daily returns from index changes
+   - Calculate Sharpe, Sortino, Calmar from returns
+
+   BenchmarkProvider.get_benchmark(BenchmarkType.AAVE_USDC)
+   PerformanceComparator.generate_comparison_report()
+   - Alpha = Strategy APY - Benchmark APY
+   - Information Ratio = Alpha / Tracking Error
+
+   Returns PerformanceReport(total_return=0.22, sharpe_ratio=2.1, alpha=0.007)
+   ↓
+9. Layer 5 Rendering
+   app_enhanced.py receives PerformanceReport
+   Renders:
+   - Metric cards (Return, Sharpe, Alpha)
+   - Charts (Portfolio value over time, drawdown)
+   - Tables (Daily performance, benchmark comparison)
+```
+
+### Architectural Benefits
+
+1. **Single Source of Truth**: Each data type has ONE canonical location
+   - Raw rates: Layer 1 (unmodified API responses)
+   - Quality-assured rates: Layer 2 (validated, smoothed)
+   - Position state: Layer 3 (share price index)
+   - Performance metrics: Layer 4 (TWR, Sharpe, alpha)
+
+2. **Unidirectional Data Flow**: Data only flows DOWN the stack
+   - Layer 5 never calculates metrics (reads from Layer 4)
+   - Layer 4 never manages positions (reads from Layer 3)
+   - Layer 3 never fetches data (reads from Layer 2)
+
+3. **Clear Boundaries**: Each layer has well-defined responsibility
+   - Easy to test in isolation
+   - Changes to one layer don't ripple to others
+   - New features added to appropriate layer
+
+4. **Traceable**: Full data provenance from API → Display
+   - Debug by following data down the stack
+   - Validate calculations at each layer boundary
+
+### Anti-Patterns (What NOT to Do)
+
+❌ **DON'T: Calculate metrics in UI**
+```python
+# BAD (Layer 5 doing Layer 4 work)
+sharpe_ratio = (avg_return - 0.04) / std_dev
+st.metric("Sharpe Ratio", sharpe_ratio)
+```
+
+✅ **DO: Pass calculated metrics to UI**
+```python
+# GOOD (Layer 4 → Layer 5)
+report = performance_metrics.calculate_all_metrics(...)
+st.metric("Sharpe Ratio", report['sharpe_ratio'])
+```
+
+❌ **DON'T: Fetch data in Strategy layer**
+```python
+# BAD (Layer 3 doing Layer 1 work)
+response = requests.get('https://api.aave.com/...')
+supply_apy = response.json()['supplyRate']
+```
+
+✅ **DO: Use normalized data from Layer 2**
+```python
+# GOOD (Layer 2 → Layer 3)
+normalized_data = market_data.get_quality_assured_rates('aave', 'USDC')
+supply_apy = normalized_data.smoothed_supply_apy
+```
+
+❌ **DON'T: Skip layers**
+```python
+# BAD (Layer 5 → Layer 1, skipping 2, 3, 4)
+raw_data = aave_client.fetch_rates()  # Layer 1
+st.metric("APY", raw_data['supplyRate'])  # Layer 5
+```
+
+✅ **DO: Follow the hierarchy**
+```python
+# GOOD (5 → 4 → 3 → 2 → 1)
+simulator = TreasurySimulator()  # Layer 3
+report = metrics.calculate_all_metrics(simulator.state)  # Layer 4
+st.metric("APY", report['strategy_apy'])  # Layer 5
+```
+
+### Implementation Status
+
+**Phase 4 (Completed):**
+- ✅ Layer 2 foundations: `DataQualityChecker`, `RateSmoother`
+- ✅ Layer 3 improvements: Real-time drawdown tracking
+- ✅ Layer 4 enhancements: Index-based TWR calculation
+
+**Phase 5 (In Progress):**
+- ⏳ Create `src/market_data/normalized_rates.py` (Layer 2)
+- ⏳ Extract analytics from `app_enhanced.py` to Layer 4
+- ⏳ Document data contracts between layers
+- ⏳ Refactor UI to ONLY render (no calculations)
+
+See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) Phase 5 for detailed tasks.
+
+---
+
 ## System Summary
 
 **Yield Guard Bot** is a sophisticated DeFi treasury management system with:
 
 1. **Clean Architecture** - Separation of UI, business logic, data, and external services
-2. **Robust Simulation Engine** - Multi-protocol portfolio management with daily stepping
-3. **Advanced Analytics** - Professional-grade performance metrics (Sharpe, drawdown, etc.)
-4. **Production-Ready** - 100% test coverage, error handling, database persistence
-5. **Beautiful UI** - Spark Protocol-inspired dashboard with Plotly visualizations
-6. **Extensible Design** - Easy to add new protocols, strategies, and features
-7. **Risk-Aware** - Health factor monitoring and liquidation risk management
+2. **Clear Data Hierarchy** - Five-layer architecture with unidirectional flow (Phase 5)
+3. **Single Source of Truth** - Each data type has ONE canonical representation
+4. **Robust Simulation Engine** - Multi-protocol portfolio management with daily stepping
+5. **Advanced Analytics** - Professional-grade performance metrics (Sharpe, drawdown, etc.)
+6. **Production-Ready** - 100% test coverage, error handling, database persistence, real-time risk tracking
+7. **Beautiful UI** - Spark Protocol-inspired dashboard with Plotly visualizations
+8. **Extensible Design** - Easy to add new protocols, strategies, and features
+9. **Risk-Aware** - Health factor monitoring, liquidation risk management, data quality checks
 
 This is a **production-grade financial application** suitable for managing real DeFi treasuries.
 
+**Recent Improvements (2026-01-11):**
+- Phase 3: Fixed TWR calculation to use share price index
+- Phase 4: Added real-time risk tracking, data quality checks, rate smoothing
+- Phase 5: Established clear architectural hierarchy with source of truth layer
+
 ---
 
-*Last Updated: January 2026*
+*Last Updated: January 11, 2026*

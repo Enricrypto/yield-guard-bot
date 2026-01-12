@@ -47,3 +47,18 @@ simulation_summary.txt
 
 # Debug files
 debug_*.py
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Backup files
+*.backup
+*.bak
+
+# OS files
+Thumbs.db

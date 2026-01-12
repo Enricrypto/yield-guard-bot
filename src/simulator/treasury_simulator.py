@@ -35,6 +35,11 @@ class PortfolioSnapshot:
 
     # Positions
     num_positions: int
+
+    # Drawdown tracking (real-time risk)
+    current_drawdown: Decimal = Decimal('0')  # Current drawdown from peak
+    peak_value: Decimal = Decimal('0')  # Running peak value
+
     positions: List[Dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -49,6 +54,8 @@ class PortfolioSnapshot:
             'daily_yield': float(self.daily_yield),
             'cumulative_yield': float(self.cumulative_yield),
             'daily_return_pct': float(self.daily_return_pct),
+            'current_drawdown': float(self.current_drawdown),
+            'peak_value': float(self.peak_value),
             'num_positions': self.num_positions,
             'positions': self.positions
         }
@@ -71,7 +78,8 @@ class TreasurySimulator:
         self,
         initial_capital: Decimal,
         name: str = "Treasury",
-        min_health_factor: Decimal = Decimal('1.5')
+        min_health_factor: Decimal = Decimal('1.5'),
+        harvest_frequency_days: int = 3
     ):
         """
         Initialize treasury simulator
@@ -80,11 +88,13 @@ class TreasurySimulator:
             initial_capital: Starting capital
             name: Treasury name
             min_health_factor: Minimum acceptable health factor
+            harvest_frequency_days: How often to harvest (crystallize) yields (default: every 3 days)
         """
         self.name = name
         self.initial_capital = initial_capital
         self.available_capital = initial_capital
         self.min_health_factor = min_health_factor
+        self.harvest_frequency_days = harvest_frequency_days
 
         # Positions
         self.positions: List[Position] = []
@@ -98,6 +108,14 @@ class TreasurySimulator:
         self.total_protocol_fees = Decimal('0')
         self.total_slippage = Decimal('0')
         self.num_transactions = 0
+        self.num_harvests = 0  # Track harvest events
+
+        # Real-time risk tracking
+        self.peak_value = initial_capital  # Running peak for drawdown calculation
+        self.current_drawdown = Decimal('0')  # Current drawdown from peak
+        self.max_drawdown = Decimal('0')  # Worst drawdown experienced
+        self.worst_daily_loss = Decimal('0')  # Worst single-day loss
+        self.drawdown_history: List[Decimal] = []  # Track drawdown over time
 
         # Metadata
         self.created_at = datetime.now()
@@ -127,7 +145,8 @@ class TreasurySimulator:
             'withdraw': Decimal('12.00'),     # ~$12 for withdraw
             'borrow': Decimal('18.00'),       # ~$18 for borrow (more complex)
             'repay': Decimal('15.00'),        # ~$15 for ERC20 approve + repay
-            'rebalance': Decimal('25.00')     # ~$25 for withdraw + deposit combo
+            'rebalance': Decimal('25.00'),    # ~$25 for withdraw + deposit combo
+            'harvest': Decimal('10.00')       # ~$10 for claiming/harvesting rewards
         }
 
         # Protocol fees (percentage of amount)
@@ -391,17 +410,37 @@ class TreasurySimulator:
                         liquidation_threshold=asset_data.get('liquidation_threshold')
                     )
 
-        # Accrue interest on all positions
-        total_earned = Decimal('0')
-        total_paid = Decimal('0')
+        # Accrue yield on all positions (index-based)
+        total_yield_accrued = Decimal('0')
+        total_harvested = Decimal('0')
 
         for position in self.positions:
-            earned, paid = position.accrue_interest(days=days)
-            total_earned += earned
-            total_paid += paid
+            # Accrue yield (adds to pending/unrealized)
+            yield_accrued = position.accrue_yield(days=days)
+            total_yield_accrued += yield_accrued
 
-        daily_yield = total_earned - total_paid
-        self.cumulative_yield += daily_yield
+            # Check if it's time to harvest this position
+            if position.days_since_last_harvest >= self.harvest_frequency_days:
+                harvested = position.harvest()
+
+                # Deduct harvest gas fee from the harvested amount
+                harvest_gas_fee = self._calculate_transaction_costs(
+                    'harvest',
+                    harvested,
+                    position.protocol
+                )['gas_fee']
+
+                # Track gas costs
+                self.total_gas_fees += harvest_gas_fee
+                self.num_transactions += 1
+
+                # Net harvest after gas
+                net_harvested = harvested - harvest_gas_fee
+                total_harvested += net_harvested
+                self.num_harvests += 1
+
+        # Update cumulative yield based on harvested amounts
+        self.cumulative_yield += total_harvested
 
         # Calculate portfolio metrics
         total_collateral = self.get_total_collateral()
@@ -414,11 +453,34 @@ class TreasurySimulator:
         if len(self.history) > 0:
             prev_value = self.history[-1].net_value
             daily_return_pct = ((net_value - prev_value) / prev_value) if prev_value > 0 else Decimal('0')
+
+            # Track worst single-day loss
+            if daily_return_pct < self.worst_daily_loss:
+                self.worst_daily_loss = daily_return_pct
         else:
             prev_value = self.initial_capital
             daily_return_pct = ((net_value - prev_value) / prev_value) if prev_value > 0 else Decimal('0')
 
+        # Real-time drawdown tracking
+        # Update peak if we've reached a new high
+        if net_value > self.peak_value:
+            self.peak_value = net_value
+            self.current_drawdown = Decimal('0')
+        else:
+            # Calculate current drawdown from peak
+            self.current_drawdown = (net_value - self.peak_value) / self.peak_value if self.peak_value > 0 else Decimal('0')
+
+            # Update max drawdown if this is worse
+            if self.current_drawdown < self.max_drawdown:
+                self.max_drawdown = self.current_drawdown
+
+        # Track drawdown history for analysis
+        self.drawdown_history.append(self.current_drawdown)
+
         # Create snapshot
+        # daily_yield now represents total accrued (including unrealized)
+        daily_yield = total_yield_accrued
+
         snapshot = PortfolioSnapshot(
             timestamp=self.current_date,
             total_collateral=total_collateral,
@@ -429,6 +491,8 @@ class TreasurySimulator:
             daily_yield=daily_yield,
             cumulative_yield=self.cumulative_yield,
             daily_return_pct=daily_return_pct * Decimal('100'),  # Convert to percentage
+            current_drawdown=self.current_drawdown,
+            peak_value=self.peak_value,
             num_positions=len(self.positions),
             positions=[pos.to_dict() for pos in self.positions]
         )

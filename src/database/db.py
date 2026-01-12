@@ -27,6 +27,11 @@ class SimulationRun:
     num_rebalances: int = 0
     sortino_ratio: float = 0.0
     win_rate: float = 0.0
+    worst_daily_loss: float = 0.0  # Worst single-day loss experienced
+    # Index-based fields
+    index_return: float = 0.0  # Return based on share price index (TWR)
+    final_index: float = 1.0  # Final share price index value
+    harvest_frequency_days: int = 3  # How often harvests occurred
     id: Optional[int] = None
 
 
@@ -41,6 +46,14 @@ class PortfolioSnapshot:
     overall_health_factor: Optional[float]
     cumulative_yield: float
     timestamp: datetime
+    # Index-based fields
+    share_price_index: float = 1.0  # Weighted avg share price index across positions
+    realized_yield: float = 0.0  # Harvested yield (in index)
+    unrealized_yield: float = 0.0  # Pending yield (before harvest)
+    num_harvests: int = 0  # Number of harvests so far
+    # Real-time drawdown tracking
+    current_drawdown: float = 0.0  # Current drawdown from peak
+    peak_value: float = 0.0  # Running peak value
     id: Optional[int] = None
 
 
@@ -159,6 +172,60 @@ class DatabaseManager:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Migration: Add worst-case period loss tracking
+        try:
+            cursor.execute("ALTER TABLE simulation_runs ADD COLUMN worst_daily_loss REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        # Migration: Add index tracking columns to portfolio_snapshots
+        try:
+            cursor.execute("ALTER TABLE portfolio_snapshots ADD COLUMN share_price_index REAL DEFAULT 1.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE portfolio_snapshots ADD COLUMN realized_yield REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE portfolio_snapshots ADD COLUMN unrealized_yield REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        # Migration: Add real-time drawdown tracking columns
+        try:
+            cursor.execute("ALTER TABLE portfolio_snapshots ADD COLUMN current_drawdown REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE portfolio_snapshots ADD COLUMN peak_value REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE portfolio_snapshots ADD COLUMN num_harvests INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        # Migration: Add index-based return fields to simulation_runs
+        try:
+            cursor.execute("ALTER TABLE simulation_runs ADD COLUMN index_return REAL DEFAULT 0.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE simulation_runs ADD COLUMN final_index REAL DEFAULT 1.0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE simulation_runs ADD COLUMN harvest_frequency_days INTEGER DEFAULT 3")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
 
@@ -180,8 +247,9 @@ class DatabaseManager:
                 strategy_name, initial_capital, simulation_days,
                 protocols_used, total_return, annualized_return,
                 max_drawdown, sharpe_ratio, final_value, total_gas_fees,
-                num_rebalances, sortino_ratio, win_rate, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                num_rebalances, sortino_ratio, win_rate, worst_daily_loss,
+                index_return, final_index, harvest_frequency_days, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             simulation.strategy_name,
             simulation.initial_capital,
@@ -196,6 +264,10 @@ class DatabaseManager:
             simulation.num_rebalances,
             simulation.sortino_ratio,
             simulation.win_rate,
+            simulation.worst_daily_loss,
+            simulation.index_return,
+            simulation.final_index,
+            simulation.harvest_frequency_days,
             simulation.created_at
         ))
 
@@ -223,8 +295,10 @@ class DatabaseManager:
         cursor.execute("""
             INSERT INTO portfolio_snapshots (
                 simulation_id, day, net_value, total_collateral,
-                total_debt, overall_health_factor, cumulative_yield, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                total_debt, overall_health_factor, cumulative_yield, timestamp,
+                share_price_index, realized_yield, unrealized_yield, num_harvests,
+                current_drawdown, peak_value
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             snapshot.simulation_id,
             snapshot.day,
@@ -233,7 +307,13 @@ class DatabaseManager:
             snapshot.total_debt,
             snapshot.overall_health_factor,
             snapshot.cumulative_yield,
-            snapshot.timestamp
+            snapshot.timestamp,
+            snapshot.share_price_index,
+            snapshot.realized_yield,
+            snapshot.unrealized_yield,
+            snapshot.num_harvests,
+            snapshot.current_drawdown,
+            snapshot.peak_value
         ))
 
         snapshot_id = cursor.lastrowid

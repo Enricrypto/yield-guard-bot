@@ -192,10 +192,11 @@ def render_simulation_tab():
                     # Use risk tolerance as strategy name directly
                     strategy_name = risk_tolerance
 
-                    # Initialize simulator
+                    # Initialize simulator with harvest every 3 days (realistic for L2/low gas)
                     simulator = TreasurySimulator(
                         initial_capital=Decimal(str(initial_capital)),
-                        name=f"{strategy_name} Strategy"
+                        name=f"{strategy_name} Strategy",
+                        harvest_frequency_days=3
                     )
 
                     # Create initial positions based on selected protocols
@@ -309,10 +310,17 @@ def render_simulation_tab():
                         simulation_days
                     )
 
-                    # Calculate max drawdown
+                    # Use simulator's real-time tracked max drawdown (more accurate)
+                    # The simulator tracks this during the simulation itself
+                    max_drawdown = simulator.max_drawdown
+
+                    # Also calculate from portfolio values for comparison
                     portfolio_values = [s.net_value for s in snapshots]
                     max_dd_data = metrics.calculate_max_drawdown(portfolio_values)
-                    max_drawdown = max_dd_data['max_drawdown']
+
+                    # Use whichever is worse (more negative)
+                    if max_dd_data['max_drawdown'] < max_drawdown:
+                        max_drawdown = max_dd_data['max_drawdown']
 
                     # Calculate Sharpe ratio
                     daily_returns = []
@@ -339,13 +347,46 @@ def render_simulation_tab():
                         elif abs(float(sortino)) > 10:
                             sortino = Decimal('0')
 
-                        # Calculate Win Rate (% of profitable days)
+                            # Calculate Win Rate (% of profitable days)
                         win_rate = metrics.calculate_win_rate(daily_returns)
                     else:
                         # Not enough data for meaningful metrics
                         sharpe = Decimal('0')
                         sortino = Decimal('0')
                         win_rate = Decimal('0')
+
+                    # Extract share price index history from positions
+                    # Calculate weighted average index across all positions
+                    index_history = []
+                    for snapshot in snapshots:
+                        if snapshot.positions:
+                            # Weighted average index by position value
+                            total_value = Decimal('0')
+                            weighted_index_sum = Decimal('0')
+
+                            for pos_dict in snapshot.positions:
+                                pos_value = Decimal(str(pos_dict.get('collateral_amount', 0)))
+                                pos_index = Decimal(str(pos_dict.get('share_price_index', 1.0)))
+                                total_value += pos_value
+                                weighted_index_sum += pos_value * pos_index
+
+                            if total_value > 0:
+                                avg_index = weighted_index_sum / total_value
+                            else:
+                                avg_index = Decimal('1.0')
+
+                            index_history.append(avg_index)
+                        else:
+                            index_history.append(Decimal('1.0'))
+
+                    # Calculate index-based return (True TWR)
+                    if len(index_history) >= 2:
+                        initial_index = index_history[0]
+                        final_index = index_history[-1]
+                        index_return = (final_index / initial_index) - Decimal('1') if initial_index > 0 else Decimal('0')
+                    else:
+                        final_index = Decimal('1.0')
+                        index_return = Decimal('0')
 
                     # Save to database
                     db = DatabaseManager(st.session_state.config.database_path)
@@ -365,6 +406,10 @@ def render_simulation_tab():
                         num_rebalances=simulator.num_transactions,  # Track total transactions for now
                         sortino_ratio=float(sortino),
                         win_rate=float(win_rate),
+                        # Index-based fields
+                        index_return=float(index_return),
+                        final_index=float(final_index),
+                        harvest_frequency_days=simulator.harvest_frequency_days,
                         created_at=datetime.now()
                     )
 
@@ -372,6 +417,19 @@ def render_simulation_tab():
 
                     # Save daily snapshots
                     for day, snapshot in enumerate(snapshots):
+                        # Calculate index and yield data for this snapshot
+                        if day < len(index_history):
+                            snapshot_index = float(index_history[day])
+                        else:
+                            snapshot_index = 1.0
+
+                        # Calculate realized/unrealized yield from positions
+                        realized_yield_total = Decimal('0')
+                        unrealized_yield_total = Decimal('0')
+                        for pos_dict in snapshot.positions:
+                            realized_yield_total += Decimal(str(pos_dict.get('realized_yield', 0)))
+                            unrealized_yield_total += Decimal(str(pos_dict.get('unrealized_yield', 0)))
+
                         ps = PortfolioSnapshot(
                             simulation_id=simulation_id,
                             day=day,
@@ -380,7 +438,12 @@ def render_simulation_tab():
                             total_debt=float(snapshot.total_debt),
                             overall_health_factor=float(snapshot.overall_health_factor) if snapshot.overall_health_factor != Decimal('Infinity') else None,
                             cumulative_yield=float(snapshot.cumulative_yield),
-                            timestamp=snapshot.timestamp
+                            timestamp=snapshot.timestamp,
+                            # Index-based fields
+                            share_price_index=snapshot_index,
+                            realized_yield=float(realized_yield_total),
+                            unrealized_yield=float(unrealized_yield_total),
+                            num_harvests=simulator.num_harvests
                         )
                         db.save_portfolio_snapshot(ps)
 
@@ -431,6 +494,43 @@ def render_simulation_tab():
                         unsafe_allow_html=True
                     )
 
+                    # Display harvest summary (index-based accounting)
+                    total_realized = sum(pos.realized_yield for pos in simulator.positions)
+                    total_unrealized = sum(pos.unrealized_yield for pos in simulator.positions)
+                    avg_index = sum(pos.share_price_index for pos in simulator.positions) / len(simulator.positions) if simulator.positions else Decimal('1.0')
+
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1rem; border-radius:8px; margin:1rem 0; border-left:4px solid {colors.GRADIENT_TEAL};">
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; text-transform:uppercase; margin:0 0 0.5rem 0;">
+                                <ion-icon name="leaf" style="vertical-align:middle;"></ion-icon> Yield Harvesting (Index-Based TWR)
+                            </p>
+                            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:1rem; font-family:JetBrains Mono,monospace; font-size:0.85rem;">
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Total Harvests:</span>
+                                    <span style="color:{colors.SUCCESS}; margin-left:0.5rem; font-weight:700;">{simulator.num_harvests}</span>
+                                </div>
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Realized:</span>
+                                    <span style="color:{colors.SUCCESS}; margin-left:0.5rem;">{format_currency_eu(float(total_realized))}</span>
+                                </div>
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Unrealized:</span>
+                                    <span style="color:{colors.ACCENT_ORANGE}; margin-left:0.5rem;">{format_currency_eu(float(total_unrealized))}</span>
+                                </div>
+                                <div>
+                                    <span style="color:{colors.TEXT_TERTIARY};">Avg Index:</span>
+                                    <span style="color:{colors.GRADIENT_TEAL}; margin-left:0.5rem; font-weight:700;">{format_number_eu(float(avg_index), 6)}</span>
+                                </div>
+                            </div>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.5rem 0 0 0; font-style:italic;">
+                                Harvest every {simulator.harvest_frequency_days} days • True Time-Weighted Return (TWR) from share price index
+                            </p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
                     # Display per-protocol performance breakdown
                     if simulator.positions:
                         st.markdown("---")
@@ -467,6 +567,10 @@ def render_simulation_tab():
                                 else:
                                     value_font_size = "1.5rem"
 
+                                # Index-based metrics
+                                index_return_pct = position.get_index_return() * 100
+                                index_color = colors.SUCCESS if index_return_pct > 0 else colors.ERROR if index_return_pct < 0 else colors.TEXT_SECONDARY
+
                                 st.markdown(
                                     f"""
                                     <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_PURPLE};">
@@ -474,23 +578,30 @@ def render_simulation_tab():
                                             {position.protocol.upper()}
                                         </p>
                                         <h2 style="color:{colors.TEXT_PRIMARY}; margin:0.5rem 0; font-family:JetBrains Mono,monospace; font-size:{value_font_size}; white-space:nowrap;">{format_currency_eu(float(position_value))}</h2>
-                                        <p style="color:{perf_color}; margin:0; font-size:0.85rem; font-family:JetBrains Mono,monospace; white-space:nowrap;">
-                                            {'+' if position_return > 0 else ''}{format_percentage_eu(float(position_return))} return
+                                        <p style="color:{index_color}; margin:0; font-size:0.85rem; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            {'+' if index_return_pct > 0 else ''}{format_percentage_eu(float(index_return_pct))} TWR
                                         </p>
                                         <hr style="border:none; border-top:1px solid {colors.BG_PRIMARY}; margin:0.75rem 0;">
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
-                                            Initial: {format_currency_eu(float(initial_position_value))}
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            Share Index: {format_number_eu(float(position.share_price_index), 6)}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
-                                            APY: {format_percentage_eu(float(position_apy))}
+                                        <p style="color:{colors.SUCCESS}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            Realized: {format_currency_eu(float(position.realized_yield))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                        <p style="color:{colors.ACCENT_ORANGE}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            Unrealized: {format_currency_eu(float(position.unrealized_yield))}
+                                        </p>
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                            Days to Harvest: {simulator.harvest_frequency_days - position.days_since_last_harvest}
+                                        </p>
+                                        <hr style="border:none; border-top:1px solid {colors.BG_PRIMARY}; margin:0.5rem 0;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             Collateral: {format_currency_eu(float(position.collateral_amount))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             Debt: {format_currency_eu(float(position.debt_amount))}
                                         </p>
-                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.75rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
+                                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0.25rem 0; font-family:JetBrains Mono,monospace; white-space:nowrap;">
                                             Health: {format_number_eu(float(position.health_factor), 2) if position.health_factor != Decimal('Infinity') else '∞'}
                                         </p>
                                     </div>
@@ -540,6 +651,45 @@ def render_dashboard_tab():
         unsafe_allow_html=True
     )
 
+    # Benchmark selection
+    from src.analytics.benchmarks import BenchmarkProvider, BenchmarkType, PerformanceComparator
+
+    st.markdown("---")
+    benchmark_col1, benchmark_col2 = st.columns([3, 1])
+
+    with benchmark_col1:
+        st.markdown(
+            f"""
+            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.9rem; margin-bottom:0.5rem;">
+                <ion-icon name="analytics" style="vertical-align:middle;"></ion-icon>
+                <strong>Compare Against Benchmark</strong> - Evaluate risk-adjusted performance
+            </p>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with benchmark_col2:
+        benchmark_options = {
+            "Aave V3 USDC (3.5% APY)": BenchmarkType.AAVE_USDC,
+            "US Treasury Bills (4.5% APY)": BenchmarkType.TREASURY_BILL,
+            "ETH Staking (3.5% APY)": BenchmarkType.ETH_STAKING,
+            "Compound V3 USDC (3.0% APY)": BenchmarkType.COMPOUND_USDC,
+            "Morpho USDC (5.0% APY)": BenchmarkType.MORPHO_USDC,
+        }
+
+        selected_benchmark_name = st.selectbox(
+            "Benchmark:",
+            options=list(benchmark_options.keys()),
+            index=0,
+            key="benchmark_selector",
+            label_visibility="collapsed"
+        )
+
+        selected_benchmark_type = benchmark_options[selected_benchmark_name]
+        selected_benchmark = BenchmarkProvider.get_benchmark(selected_benchmark_type)
+
+    st.markdown("---")
+
     # Fetch latest simulation data
     try:
         conn = get_db_connection()
@@ -555,7 +705,9 @@ def render_dashboard_tab():
                 max_drawdown,
                 total_gas_fees,
                 num_rebalances,
-                created_at
+                created_at,
+                sortino_ratio,
+                win_rate
             FROM simulation_runs
             ORDER BY created_at DESC
             LIMIT 1
@@ -574,6 +726,13 @@ def render_dashboard_tab():
             drawdown = latest[4] * 100
             gas_fees = latest[5]
             rebalances = latest[6]
+            # New metrics
+            sortino = latest[8] if latest[8] is not None else 0.0
+            if abs(sortino) > 10 or sortino != sortino:
+                sortino = 0.0
+            sortino = round(float(sortino), 2)
+            win_rate = latest[9] if latest[9] is not None else 0.0
+            win_rate_pct = round(float(win_rate) * 100, 1)
             pnl = final_val - initial_cap
             pnl_pct = (pnl / initial_cap) * 100
         else:
@@ -585,6 +744,8 @@ def render_dashboard_tab():
             drawdown = 0
             gas_fees = 0
             rebalances = 0
+            sortino = 0
+            win_rate_pct = 0
             pnl = 0
             pnl_pct = 0
 
@@ -596,6 +757,8 @@ def render_dashboard_tab():
         sharpe = 0
         drawdown = 0
         gas_fees = 0
+        sortino = 0
+        win_rate_pct = 0
         rebalances = 0
         pnl = 0
         pnl_pct = 0
@@ -682,6 +845,93 @@ def render_dashboard_tab():
             </div>
             <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
                 Largest drop from high to low. Lower is better
+            </div>
+        </div>
+        """
+        st.markdown(metric_card_html, unsafe_allow_html=True)
+
+    # Second row: Stablecoin-specific metrics
+    st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+    col5, col6, col7, col8 = st.columns(4)
+
+    with col5:
+        sortino_clamped = min(max(float(sortino), -10), 10)
+        sortino_color = colors.GRADIENT_TEAL if sortino_clamped > 1.5 else colors.GRADIENT_BLUE if sortino_clamped > 1.0 else colors.GRADIENT_ORANGE
+        metric_card_html = f"""
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+                <ion-icon name="trending-down" style="vertical-align:middle;"></ion-icon>
+                Sortino Ratio
+            </div>
+            <div style="font-size:2rem;color:{sortino_color};font-family:JetBrains Mono,monospace;line-height:1.2;">
+                {format_number_eu(sortino_clamped, 2)}
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
+                Downside risk-adjusted
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
+                Like Sharpe but only penalizes downside volatility
+            </div>
+        </div>
+        """
+        st.markdown(metric_card_html, unsafe_allow_html=True)
+
+    with col6:
+        win_rate_color = colors.GRADIENT_TEAL if win_rate_pct > 60 else colors.GRADIENT_BLUE if win_rate_pct > 50 else colors.GRADIENT_ORANGE
+        metric_card_html = f"""
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+                <ion-icon name="checkmark-circle" style="vertical-align:middle;"></ion-icon>
+                Win Rate
+            </div>
+            <div style="font-size:2rem;color:{win_rate_color};font-family:JetBrains Mono,monospace;line-height:1.2;">
+                {format_percentage_eu(win_rate_pct)}
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
+                % of profitable days
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
+                Consistency metric. Higher is better for stablecoins
+            </div>
+        </div>
+        """
+        st.markdown(metric_card_html, unsafe_allow_html=True)
+
+    with col7:
+        metric_card_html = f"""
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+                <ion-icon name="cash" style="vertical-align:middle;"></ion-icon>
+                Transaction Costs
+            </div>
+            <div style="font-size:2rem;color:{colors.GRADIENT_ORANGE};font-family:JetBrains Mono,monospace;line-height:1.2;">
+                {format_currency_eu(gas_fees)}
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
+                Gas + Protocol fees
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
+                Total cost of all transactions
+            </div>
+        </div>
+        """
+        st.markdown(metric_card_html, unsafe_allow_html=True)
+
+    with col8:
+        metric_card_html = f"""
+        <div class="bento-item" style="padding:1.5rem; height:200px; display:flex; flex-direction:column; box-sizing:border-box;">
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">
+                <ion-icon name="swap-horizontal" style="vertical-align:middle;"></ion-icon>
+                Rebalances
+            </div>
+            <div style="font-size:2rem;color:{colors.GRADIENT_PURPLE};font-family:JetBrains Mono,monospace;line-height:1.2;">
+                {rebalances}
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.75rem;margin-top:0.5rem;">
+                Portfolio adjustments
+            </div>
+            <div style="color:{colors.TEXT_TERTIARY};font-size:0.65rem;margin-top:auto;padding-top:0.5rem;opacity:0.8;font-style:italic;line-height:1.3;">
+                Number of times portfolio was rebalanced
             </div>
         </div>
         """
@@ -922,6 +1172,224 @@ def render_dashboard_tab():
             unsafe_allow_html=True
         )
 
+    # Benchmark Comparison Section
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Only show benchmark comparison if we have snapshot data
+    try:
+        if snapshot_rows and len(snapshot_rows) > 1:
+            st.markdown(
+                f"""
+                <div class="bento-item" style="padding:1.5rem;">
+                    <h3 style="color:{colors.GRADIENT_ORANGE};">
+                        <ion-icon name="git-compare" style="vertical-align:middle;"></ion-icon>
+                        Performance vs Benchmark: {selected_benchmark.name}
+                    </h3>
+                    <p style="color:{colors.TEXT_TERTIARY}; font-size:0.85rem; margin-top:-0.5rem;">
+                        Risk-adjusted evaluation • {selected_benchmark.description} • {selected_benchmark.risk_level} risk
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # Calculate daily returns from net values
+            strategy_returns = []
+            for i in range(1, len(net_values)):
+                daily_return = (Decimal(str(net_values[i])) - Decimal(str(net_values[i-1]))) / Decimal(str(net_values[i-1]))
+                strategy_returns.append(daily_return)
+
+            # Generate benchmark returns for the same period
+            num_days = len(net_values)
+            benchmark_returns = BenchmarkProvider.generate_benchmark_returns(
+                selected_benchmark_type,
+                num_days - 1  # One less since returns are calculated from differences
+            )
+
+            # Ensure both lists have the same length
+            min_len = min(len(strategy_returns), len(benchmark_returns))
+            strategy_returns = strategy_returns[:min_len]
+            benchmark_returns = benchmark_returns[:min_len]
+
+            # Calculate annualized return from total return
+            if total_ret != 0:
+                days_elapsed = len(net_values)
+                annualized_return = ((1 + total_ret/100) ** (365 / days_elapsed) - 1) * 100
+            else:
+                annualized_return = 0
+
+            strategy_apy = Decimal(str(annualized_return / 100))
+            benchmark_apy = selected_benchmark.typical_apy
+
+            # Generate comparison report
+            comparison_report = PerformanceComparator.generate_comparison_report(
+                strategy_returns=strategy_returns,
+                benchmark_returns=benchmark_returns,
+                strategy_apy=strategy_apy,
+                benchmark_apy=benchmark_apy,
+                benchmark_name=selected_benchmark.name
+            )
+
+            # Display comparative metrics in cards
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                alpha = comparison_report['annualized_alpha_pct']
+                alpha_color = colors.GRADIENT_TEAL if alpha > 0 else colors.ACCENT_RED
+                st.markdown(
+                    f"""
+                    <div class="bento-item" style="padding:1.25rem; text-align:center;">
+                        <div style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; text-transform:uppercase; margin-bottom:0.5rem;">Alpha (Excess Return)</div>
+                        <div style="font-size:1.8rem; color:{alpha_color}; font-family:JetBrains Mono,monospace;">
+                            {'+' if alpha >= 0 else ''}{format_percentage_eu(alpha)}
+                        </div>
+                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Excess return vs benchmark</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            with col2:
+                info_ratio = comparison_report['information_ratio']
+                ir_color = colors.GRADIENT_TEAL if info_ratio > 0.5 else colors.GRADIENT_ORANGE
+                ir_label = "Excellent" if info_ratio > 1.0 else "Good" if info_ratio > 0.5 else "Below benchmark"
+                st.markdown(
+                    f"""
+                    <div class="bento-item" style="padding:1.25rem; text-align:center;">
+                        <div style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; text-transform:uppercase; margin-bottom:0.5rem;">Information Ratio</div>
+                        <div style="font-size:1.8rem; color:{ir_color}; font-family:JetBrains Mono,monospace;">
+                            {format_number_eu(info_ratio, 2)}
+                        </div>
+                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">{ir_label}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            with col3:
+                upside = comparison_report['upside_capture']
+                upside_color = colors.GRADIENT_TEAL if upside > 1.0 else colors.GRADIENT_BLUE
+                st.markdown(
+                    f"""
+                    <div class="bento-item" style="padding:1.25rem; text-align:center;">
+                        <div style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; text-transform:uppercase; margin-bottom:0.5rem;">Upside Capture</div>
+                        <div style="font-size:1.8rem; color:{upside_color}; font-family:JetBrains Mono,monospace;">
+                            {format_percentage_eu(upside * 100)}
+                        </div>
+                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Capture of benchmark gains</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            with col4:
+                downside = comparison_report['downside_capture']
+                downside_color = colors.GRADIENT_TEAL if downside < 1.0 else colors.ACCENT_RED
+                st.markdown(
+                    f"""
+                    <div class="bento-item" style="padding:1.25rem; text-align:center;">
+                        <div style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; text-transform:uppercase; margin-bottom:0.5rem;">Downside Capture</div>
+                        <div style="font-size:1.8rem; color:{downside_color}; font-family:JetBrains Mono,monospace;">
+                            {format_percentage_eu(downside * 100)}
+                        </div>
+                        <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Lower is better</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            # Strategy vs Benchmark Comparison Chart
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(
+                f"""
+                <div class="bento-item" style="padding:1.5rem;">
+                    <h3 style="color:{colors.GRADIENT_BLUE};">
+                        <ion-icon name="stats-chart" style="vertical-align:middle;"></ion-icon>
+                        Strategy vs Benchmark Comparison
+                    </h3>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # Generate benchmark portfolio values
+            benchmark_index = BenchmarkProvider.calculate_benchmark_index(
+                selected_benchmark_type,
+                num_days
+            )
+
+            # Normalize both to start at the same initial capital
+            initial_cap_for_comparison = net_values[0]
+            strategy_normalized = net_values
+            benchmark_normalized = [initial_cap_for_comparison * float(idx) for idx in benchmark_index[:len(net_values)]]
+
+            # Create comparison figure
+            fig_comparison = go.Figure()
+
+            # Strategy line
+            fig_comparison.add_trace(go.Scatter(
+                x=days,
+                y=strategy_normalized,
+                mode='lines',
+                name='Your Strategy',
+                line=dict(color=colors.GRADIENT_PURPLE, width=3),
+                hovertemplate='Day %{x}<br>Strategy: $%{y:,.2f}<extra></extra>'
+            ))
+
+            # Benchmark line
+            fig_comparison.add_trace(go.Scatter(
+                x=days,
+                y=benchmark_normalized,
+                mode='lines',
+                name=f'Benchmark ({selected_benchmark.name})',
+                line=dict(color=colors.GRADIENT_ORANGE, width=2, dash='dash'),
+                hovertemplate='Day %{x}<br>Benchmark: $%{y:,.2f}<extra></extra>'
+            ))
+
+            # Add fill between
+            fig_comparison.add_trace(go.Scatter(
+                x=list(days) + list(reversed(days)),
+                y=list(strategy_normalized) + list(reversed(benchmark_normalized)),
+                fill='toself',
+                fillcolor='rgba(107, 95, 237, 0.1)',
+                line=dict(color='rgba(255,255,255,0)'),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+
+            # Update layout
+            layout_config = colors.get_plotly_template()['layout'].copy()
+            layout_config['xaxis'].update({
+                'title': 'Day',
+                'showgrid': True
+            })
+            layout_config['yaxis'].update({
+                'title': 'Portfolio Value (USD)',
+                'showgrid': True,
+                'tickformat': '$,.0f'
+            })
+
+            fig_comparison.update_layout(
+                **layout_config,
+                height=350,
+                margin=dict(l=10, r=10, t=20, b=70),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.25,
+                    xanchor="center",
+                    x=0.5
+                ),
+                hovermode='x unified'
+            )
+
+            st.plotly_chart(fig_comparison, use_container_width=True)
+
+    except Exception as e:
+        # Silently skip benchmark comparison if there's an error
+        pass
+
 
 # ---------------------------------------------------------------------
 # History Tab
@@ -949,7 +1417,9 @@ def render_history_tab():
                 final_value,
                 total_return,
                 sharpe_ratio,
+                sortino_ratio,
                 max_drawdown,
+                win_rate,
                 num_rebalances,
                 created_at
             FROM simulation_runs
@@ -964,7 +1434,7 @@ def render_history_tab():
             # Create DataFrame
             df = pd.DataFrame(rows, columns=[
                 'ID', 'Initial Capital', 'Final Value', 'Total Return',
-                'Sharpe Ratio', 'Max Drawdown', 'Rebalances', 'Date'
+                'Sharpe Ratio', 'Sortino Ratio', 'Max Drawdown', 'Win Rate', 'Rebalances', 'Date'
             ])
 
             # Format columns with European notation
@@ -972,7 +1442,9 @@ def render_history_tab():
             df['Final Value'] = df['Final Value'].apply(lambda x: format_currency_eu(x))
             df['Total Return'] = df['Total Return'].apply(lambda x: f"{'+' if x >= 0 else ''}{format_percentage_eu(x*100)}")
             df['Sharpe Ratio'] = df['Sharpe Ratio'].apply(lambda x: format_number_eu(min(max(x, -10), 10), 2))  # Clamp to reasonable range
+            df['Sortino Ratio'] = df['Sortino Ratio'].apply(lambda x: format_number_eu(min(max(x, -10), 10), 2))  # Clamp to reasonable range
             df['Max Drawdown'] = df['Max Drawdown'].apply(lambda x: format_percentage_eu(x*100))
+            df['Win Rate'] = df['Win Rate'].apply(lambda x: format_percentage_eu(x*100))
             df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d %H:%M')
 
             # Build HTML table with full control
@@ -984,7 +1456,9 @@ def render_history_tab():
                     <td>{row['Final Value']}</td>
                     <td>{row['Total Return']}</td>
                     <td>{row['Sharpe Ratio']}</td>
+                    <td>{row['Sortino Ratio']}</td>
                     <td>{row['Max Drawdown']}</td>
+                    <td>{row['Win Rate']}</td>
                     <td>{row['Rebalances']}</td>
                     <td>{row['Date']}</td>
                 </tr>"""
@@ -1006,7 +1480,9 @@ def render_history_tab():
                                 <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Final Value</th>
                                 <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Total Return</th>
                                 <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Sharpe Ratio</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Sortino Ratio</th>
                                 <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Max Drawdown</th>
+                                <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Win Rate</th>
                                 <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Rebalances</th>
                                 <th style="background:{colors.BG_TERTIARY}; color:{colors.TEXT_PRIMARY}; font-family:'Space Grotesk',sans-serif; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; padding:1rem; text-align:left; border-bottom:2px solid {colors.BORDER_ACCENT};">Date</th>
                             </tr>
@@ -1113,6 +1589,8 @@ def render_history_tab():
 # ---------------------------------------------------------------------
 def render_historical_backtest_tab():
     """Render Historical Backtest tab with real market data"""
+    from src.analytics.benchmarks import BenchmarkProvider, BenchmarkType, PerformanceComparator
+
     st.markdown(
         f"""
         <h2 style="color:{colors.GRADIENT_PURPLE};">
@@ -1212,6 +1690,29 @@ def render_historical_backtest_tab():
             """,
             unsafe_allow_html=True
         )
+
+    # Benchmark selection for historical backtest
+    st.markdown("---")
+    st.markdown(f"<h3 style='color:{colors.TEXT_PRIMARY};'>Benchmark Comparison</h3>", unsafe_allow_html=True)
+
+    benchmark_options = {
+        "Aave V3 USDC (3.5% APY)": BenchmarkType.AAVE_USDC,
+        "US Treasury Bills (4.5% APY)": BenchmarkType.TREASURY_BILL,
+        "ETH Staking (3.5% APY)": BenchmarkType.ETH_STAKING,
+        "Compound V3 USDC (3.0% APY)": BenchmarkType.COMPOUND_USDC,
+        "Morpho USDC (5.0% APY)": BenchmarkType.MORPHO_USDC,
+    }
+
+    selected_benchmark_name = st.selectbox(
+        "Compare strategy against:",
+        options=list(benchmark_options.keys()),
+        index=0,
+        key="backtest_benchmark_selector",
+        help="Select a benchmark to compare your strategy's risk-adjusted performance"
+    )
+
+    selected_benchmark_type = benchmark_options[selected_benchmark_name]
+    selected_benchmark = BenchmarkProvider.get_benchmark(selected_benchmark_type)
 
     # Run Backtest Button
     st.markdown("---")
@@ -1326,7 +1827,8 @@ def render_historical_backtest_tab():
                 simulator = TreasurySimulator(
                     initial_capital=total_capital,
                     name=f"Historical Backtest - {protocol}/{asset}",
-                    min_health_factor=Decimal('1.5')
+                    min_health_factor=Decimal('1.5'),
+                    harvest_frequency_days=3
                 )
 
                 # Open initial position
@@ -1372,34 +1874,76 @@ def render_historical_backtest_tab():
                 progress_bar.empty()
                 status_text.empty()
 
+                # Extract share price index history for TRUE TWR calculation
+                index_history = []
+                for snapshot in snapshots:
+                    if snapshot.positions:
+                        # Calculate weighted average index by position value
+                        total_value = Decimal('0')
+                        weighted_index_sum = Decimal('0')
+                        for pos_dict in snapshot.positions:
+                            pos_value = Decimal(str(pos_dict.get('collateral_amount', 0)))
+                            pos_index = Decimal(str(pos_dict.get('share_price_index', 1.0)))
+                            total_value += pos_value
+                            weighted_index_sum += pos_value * pos_index
+
+                        if total_value > 0:
+                            avg_index = weighted_index_sum / total_value
+                        else:
+                            avg_index = Decimal('1.0')
+
+                        index_history.append(avg_index)
+                    else:
+                        index_history.append(Decimal('1.0'))
+
                 # Calculate performance metrics
                 portfolio_values = [s.net_value for s in snapshots]
                 final_value = portfolio_values[-1] if portfolio_values else Decimal(str(initial_capital))
 
                 metrics = PerformanceMetrics()
 
-                total_return = metrics.calculate_total_return(
-                    Decimal(str(initial_capital)),
-                    final_value
-                )
+                # Use index-based TWR calculation (TRUE time-weighted return)
+                if len(index_history) >= 2:
+                    initial_index = index_history[0]
+                    final_index = index_history[-1]
 
-                annualized_return = metrics.calculate_annualized_return(
-                    Decimal(str(initial_capital)),
-                    final_value,
-                    len(historical)
-                )
+                    # TWR from index: (final_index / initial_index) - 1
+                    total_return_twr = ((final_index / initial_index) - Decimal('1')) * 100 if initial_index > 0 else Decimal('0')
+
+                    # Annualize using compound formula: (1 + TWR)^(365/days) - 1
+                    twr_decimal = total_return_twr / 100
+                    growth_factor = Decimal('1') + twr_decimal
+                    years = Decimal(len(historical)) / Decimal('365')
+
+                    import math
+                    annualized_return_twr = (Decimal(str(math.pow(float(growth_factor), float(Decimal('1') / years)))) - Decimal('1')) * 100
+
+                    total_return = total_return_twr
+                    annualized_return = annualized_return_twr
+                else:
+                    # Fallback to money-weighted if index not available
+                    total_return = metrics.calculate_total_return(
+                        Decimal(str(initial_capital)),
+                        final_value
+                    )
+                    annualized_return = metrics.calculate_annualized_return(
+                        Decimal(str(initial_capital)),
+                        final_value,
+                        len(historical)
+                    )
 
                 max_dd_data = metrics.calculate_max_drawdown(portfolio_values)
                 max_drawdown = max_dd_data['max_drawdown']
 
-                # Calculate daily returns as Decimal
+                # Calculate daily returns from INDEX (TRUE TWR daily returns)
                 daily_returns_decimal = []
-                for i in range(1, len(portfolio_values)):
-                    prev_val = portfolio_values[i-1]
-                    curr_val = portfolio_values[i]
-                    if prev_val > 0:
-                        daily_return = (curr_val - prev_val) / prev_val
+                for i in range(1, len(index_history)):
+                    if index_history[i-1] > 0:
+                        # Daily return from index evolution
+                        daily_return = (index_history[i] / index_history[i-1]) - Decimal('1')
                         daily_returns_decimal.append(daily_return)
+                    else:
+                        daily_returns_decimal.append(Decimal('0'))
 
                 # Calculate Sharpe ratio
                 sharpe = metrics.calculate_sharpe_ratio(daily_returns_decimal)
@@ -1429,8 +1973,9 @@ def render_historical_backtest_tab():
                     st.markdown(
                         f"""
                         <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.SUCCESS};">
-                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Total Return</p>
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Strategy Return</p>
                             <h2 style="color:{colors.SUCCESS}; margin:0.5rem 0;">{total_return:.2f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Total (TWR)</p>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1440,8 +1985,9 @@ def render_historical_backtest_tab():
                     st.markdown(
                         f"""
                         <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_BLUE};">
-                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Annualized Return</p>
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Annualized</p>
                             <h2 style="color:{colors.GRADIENT_BLUE}; margin:0.5rem 0;">{annualized_return:.2f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Strategy APY</p>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1520,9 +2066,118 @@ def render_historical_backtest_tab():
                     st.markdown(
                         f"""
                         <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {colors.GRADIENT_TEAL};">
-                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Avg APY</p>
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Protocol APY</p>
                             <h2 style="color:{colors.GRADIENT_TEAL}; margin:0.5rem 0;">{avg_apy:.2f}%</h2>
-                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Historical average</p>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Avg supply rate</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # Benchmark Comparison Section
+                st.markdown("<div style='margin-top:2rem;'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style="color:{colors.GRADIENT_ORANGE};">
+                        <ion-icon name="git-compare" style="vertical-align:middle;"></ion-icon>
+                        Performance vs Benchmark: {selected_benchmark.name}
+                    </h3>
+                    <p style="color:{colors.TEXT_TERTIARY}; font-size:0.85rem; margin-top:-0.5rem;">
+                        Risk-adjusted evaluation • {selected_benchmark.description} • {selected_benchmark.risk_level} risk
+                    </p>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                # Generate benchmark data for comparison
+                num_days = len(historical)
+                benchmark_returns = BenchmarkProvider.generate_benchmark_returns(
+                    selected_benchmark_type,
+                    num_days
+                )
+
+                # Calculate strategy daily returns from historical data
+                strategy_returns = []
+                for i in range(1, len(portfolio_values)):
+                    if portfolio_values[i-1] > 0:
+                        daily_ret = (portfolio_values[i] - portfolio_values[i-1]) / portfolio_values[i-1]
+                        strategy_returns.append(Decimal(str(daily_ret)))
+                    else:
+                        strategy_returns.append(Decimal('0'))
+
+                # Ensure both lists have same length
+                min_len = min(len(strategy_returns), len(benchmark_returns))
+                strategy_returns = strategy_returns[:min_len]
+                benchmark_returns = benchmark_returns[:min_len]
+
+                # Calculate comparative metrics
+                strategy_apy = Decimal(str(annualized_return / 100))  # Convert from percentage
+                benchmark_apy = selected_benchmark.typical_apy
+
+                comparison_report = PerformanceComparator.generate_comparison_report(
+                    strategy_returns=strategy_returns,
+                    benchmark_returns=benchmark_returns,
+                    strategy_apy=strategy_apy,
+                    benchmark_apy=benchmark_apy,
+                    benchmark_name=selected_benchmark.name
+                )
+
+                # Display comparative metrics in cards
+                st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+                comp_col1, comp_col2, comp_col3, comp_col4 = st.columns(4)
+
+                with comp_col1:
+                    alpha_pct = comparison_report['annualized_alpha_pct']
+                    alpha_color = colors.SUCCESS if alpha_pct > 0 else colors.ERROR if alpha_pct < -0.5 else colors.WARNING
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {alpha_color};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Alpha</p>
+                            <h2 style="color:{alpha_color}; margin:0.5rem 0;">{'+' if alpha_pct >= 0 else ''}{alpha_pct:.2f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Excess return vs benchmark</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with comp_col2:
+                    info_ratio = comparison_report['information_ratio']
+                    ir_color = colors.SUCCESS if info_ratio > 1.0 else colors.WARNING if info_ratio > 0.5 else colors.ERROR
+                    ir_label = "Excellent" if info_ratio > 1.0 else "Good" if info_ratio > 0.5 else "Below benchmark"
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {ir_color};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Information Ratio</p>
+                            <h2 style="color:{ir_color}; margin:0.5rem 0;">{info_ratio:.2f}</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">{ir_label}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with comp_col3:
+                    upside_capture = comparison_report['upside_capture_pct']
+                    upside_color = colors.SUCCESS if upside_capture > 100 else colors.WARNING if upside_capture > 80 else colors.ERROR
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {upside_color};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Upside Capture</p>
+                            <h2 style="color:{upside_color}; margin:0.5rem 0;">{upside_capture:.0f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Capture of benchmark gains</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                with comp_col4:
+                    downside_capture = comparison_report['downside_capture_pct']
+                    downside_color = colors.SUCCESS if downside_capture < 80 else colors.WARNING if downside_capture < 100 else colors.ERROR
+                    st.markdown(
+                        f"""
+                        <div style="background:{colors.BG_SECONDARY}; padding:1.5rem; border-radius:12px; border-left:4px solid {downside_color};">
+                            <p style="color:{colors.TEXT_SECONDARY}; font-size:0.9rem; margin:0;">Downside Capture</p>
+                            <h2 style="color:{downside_color}; margin:0.5rem 0;">{downside_capture:.0f}%</h2>
+                            <p style="color:{colors.TEXT_TERTIARY}; font-size:0.7rem; margin:0; font-style:italic;">Capture of losses (lower=better)</p>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -1559,8 +2214,252 @@ def render_historical_backtest_tab():
 
                 st.plotly_chart(fig, use_container_width=True)
 
-                # APY over time chart
-                st.markdown(f"<h3 style='color:{colors.TEXT_PRIMARY};'>Historical APY Rates</h3>", unsafe_allow_html=True)
+                # Strategy vs Benchmark Comparison Chart
+                st.markdown("---")
+                st.markdown(
+                    f"""
+                    <h3 style='color:{colors.TEXT_PRIMARY};'>
+                        <ion-icon name="git-compare" style="vertical-align:middle;"></ion-icon>
+                        Strategy vs Benchmark Comparison
+                    </h3>
+                    <p style='color:{colors.TEXT_TERTIARY}; font-size:0.85rem; margin-top:-0.5rem;'>
+                        Cumulative returns comparison • Normalized to $100k starting value
+                    </p>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                # Generate benchmark portfolio values
+                benchmark_index = BenchmarkProvider.calculate_benchmark_index(
+                    selected_benchmark_type,
+                    num_days
+                )
+
+                # Normalize both to initial capital for comparison
+                initial_cap_for_comparison = float(initial_capital)
+                strategy_normalized = [float(v) for v in portfolio_values]
+                benchmark_normalized = [initial_cap_for_comparison * float(idx) for idx in benchmark_index[:len(portfolio_values)]]
+
+                fig_comparison = go.Figure()
+
+                # Strategy line
+                fig_comparison.add_trace(go.Scatter(
+                    x=days,
+                    y=strategy_normalized,
+                    mode='lines',
+                    name='Strategy (Your Portfolio)',
+                    line=dict(color=colors.GRADIENT_TEAL, width=3),
+                    hovertemplate='Day %{x}<br>Strategy: $%{y:,.2f}<extra></extra>'
+                ))
+
+                # Benchmark line
+                fig_comparison.add_trace(go.Scatter(
+                    x=days,
+                    y=benchmark_normalized,
+                    mode='lines',
+                    name=f'Benchmark ({selected_benchmark.name})',
+                    line=dict(color=colors.GRADIENT_ORANGE, width=2, dash='dash'),
+                    hovertemplate='Day %{x}<br>Benchmark: $%{y:,.2f}<extra></extra>'
+                ))
+
+                # Add shaded region showing alpha
+                fig_comparison.add_trace(go.Scatter(
+                    x=days + days[::-1],
+                    y=strategy_normalized + benchmark_normalized[::-1],
+                    fill='toself',
+                    fillcolor='rgba(61, 186, 165, 0.1)' if alpha_pct > 0 else 'rgba(255, 75, 75, 0.1)',
+                    line=dict(color='rgba(255,255,255,0)'),
+                    hoverinfo='skip',
+                    name='Alpha Region',
+                    showlegend=False
+                ))
+
+                fig_comparison.update_layout(
+                    plot_bgcolor=colors.BG_PRIMARY,
+                    paper_bgcolor=colors.BG_PRIMARY,
+                    font=dict(color=colors.TEXT_PRIMARY),
+                    xaxis_title="Day",
+                    yaxis_title="Portfolio Value ($)",
+                    hovermode='x unified',
+                    height=450,
+                    showlegend=True,
+                    legend=dict(
+                        yanchor="top",
+                        y=0.99,
+                        xanchor="left",
+                        x=0.01,
+                        bgcolor=colors.BG_SECONDARY,
+                        bordercolor=colors.TEXT_TERTIARY,
+                        borderwidth=1
+                    )
+                )
+
+                st.plotly_chart(fig_comparison, use_container_width=True)
+
+                # Share Price Index chart (TWR)
+                st.markdown("---")
+                st.markdown(
+                    f"""
+                    <h3 style='color:{colors.TEXT_PRIMARY};'>
+                        <ion-icon name="trending-up" style="vertical-align:middle;"></ion-icon>
+                        Share Price Index (Time-Weighted Return)
+                    </h3>
+                    <p style='color:{colors.TEXT_TERTIARY}; font-size:0.85rem; margin-top:-0.5rem;'>
+                        True vault-style performance tracking • Index starts at 1.0 and increases with harvested yields
+                    </p>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                # Extract index history from snapshots
+                index_history = []
+                realized_history = []
+                unrealized_history = []
+
+                for snapshot in snapshots:
+                    if hasattr(snapshot, 'positions') and snapshot.positions:
+                        # Calculate weighted average index
+                        total_value = Decimal('0')
+                        weighted_index_sum = Decimal('0')
+                        snapshot_realized = Decimal('0')
+                        snapshot_unrealized = Decimal('0')
+
+                        for pos_dict in snapshot.positions:
+                            pos_value = Decimal(str(pos_dict.get('collateral_amount', 0)))
+                            pos_index = Decimal(str(pos_dict.get('share_price_index', 1.0)))
+                            total_value += pos_value
+                            weighted_index_sum += pos_value * pos_index
+                            snapshot_realized += Decimal(str(pos_dict.get('realized_yield', 0)))
+                            snapshot_unrealized += Decimal(str(pos_dict.get('unrealized_yield', 0)))
+
+                        if total_value > 0:
+                            avg_index = weighted_index_sum / total_value
+                        else:
+                            avg_index = Decimal('1.0')
+
+                        index_history.append(float(avg_index))
+                        realized_history.append(float(snapshot_realized))
+                        unrealized_history.append(float(snapshot_unrealized))
+                    else:
+                        index_history.append(1.0)
+                        realized_history.append(0.0)
+                        unrealized_history.append(0.0)
+
+                fig_index = go.Figure()
+
+                # Add index line
+                fig_index.add_trace(go.Scatter(
+                    x=days,
+                    y=index_history,
+                    mode='lines',
+                    name='Share Price Index',
+                    line=dict(color=colors.GRADIENT_TEAL, width=3),
+                    hovertemplate='Day %{x}<br>Index: %{y:.6f}<extra></extra>'
+                ))
+
+                # Add harvest markers (where index jumps)
+                harvest_days = []
+                harvest_indices = []
+                for i in range(1, len(index_history)):
+                    # Detect harvest by significant index jump
+                    if index_history[i] > index_history[i-1] + 0.0001:
+                        harvest_days.append(i)
+                        harvest_indices.append(index_history[i])
+
+                if harvest_days:
+                    fig_index.add_trace(go.Scatter(
+                        x=harvest_days,
+                        y=harvest_indices,
+                        mode='markers',
+                        name='Harvest Events',
+                        marker=dict(
+                            color=colors.SUCCESS,
+                            size=10,
+                            symbol='star',
+                            line=dict(color=colors.TEXT_PRIMARY, width=1)
+                        ),
+                        hovertemplate='Harvest on Day %{x}<br>New Index: %{y:.6f}<extra></extra>'
+                    ))
+
+                fig_index.update_layout(
+                    plot_bgcolor=colors.BG_PRIMARY,
+                    paper_bgcolor=colors.BG_PRIMARY,
+                    font=dict(color=colors.TEXT_PRIMARY),
+                    xaxis_title="Day",
+                    yaxis_title="Share Price Index",
+                    hovermode='x unified',
+                    height=400,
+                    showlegend=True,
+                    legend=dict(
+                        yanchor="top",
+                        y=0.99,
+                        xanchor="left",
+                        x=0.01,
+                        bgcolor=colors.BG_SECONDARY,
+                        bordercolor=colors.TEXT_TERTIARY,
+                        borderwidth=1
+                    )
+                )
+
+                st.plotly_chart(fig_index, use_container_width=True)
+
+                # Realized vs Unrealized Yield chart
+                st.markdown(f"<h3 style='color:{colors.TEXT_PRIMARY};'>Realized vs Unrealized Yield</h3>", unsafe_allow_html=True)
+
+                fig_yield = go.Figure()
+
+                fig_yield.add_trace(go.Scatter(
+                    x=days,
+                    y=realized_history,
+                    mode='lines',
+                    name='Realized (Harvested)',
+                    line=dict(color=colors.SUCCESS, width=2),
+                    stackgroup='one',
+                    hovertemplate='Day %{x}<br>Realized: $%{y:,.2f}<extra></extra>'
+                ))
+
+                fig_yield.add_trace(go.Scatter(
+                    x=days,
+                    y=unrealized_history,
+                    mode='lines',
+                    name='Unrealized (Pending)',
+                    line=dict(color=colors.ACCENT_ORANGE, width=2),
+                    stackgroup='one',
+                    hovertemplate='Day %{x}<br>Unrealized: $%{y:,.2f}<extra></extra>'
+                ))
+
+                fig_yield.update_layout(
+                    plot_bgcolor=colors.BG_PRIMARY,
+                    paper_bgcolor=colors.BG_PRIMARY,
+                    font=dict(color=colors.TEXT_PRIMARY),
+                    xaxis_title="Day",
+                    yaxis_title="Yield ($)",
+                    hovermode='x unified',
+                    height=350,
+                    showlegend=True,
+                    legend=dict(
+                        yanchor="top",
+                        y=0.99,
+                        xanchor="left",
+                        x=0.01,
+                        bgcolor=colors.BG_SECONDARY,
+                        bordercolor=colors.TEXT_TERTIARY,
+                        borderwidth=1
+                    )
+                )
+
+                st.plotly_chart(fig_yield, use_container_width=True)
+
+                # Protocol APY over time chart
+                st.markdown(
+                    f"""
+                    <h3 style='color:{colors.TEXT_PRIMARY};'>Protocol Supply APY Over Time</h3>
+                    <p style='color:{colors.TEXT_TERTIARY}; font-size:0.85rem; margin-top:-0.5rem;'>
+                        Raw protocol lending rates • Strategy return shown in TWR above
+                    </p>
+                    """,
+                    unsafe_allow_html=True
+                )
 
                 fig2 = go.Figure()
 
@@ -1568,7 +2467,7 @@ def render_historical_backtest_tab():
                     x=list(range(len(apys))),
                     y=apys,
                     mode='lines',
-                    name='Supply APY',
+                    name='Protocol Supply APY',
                     line=dict(color=colors.GRADIENT_PURPLE, width=2)
                 ))
 
@@ -1577,7 +2476,7 @@ def render_historical_backtest_tab():
                     paper_bgcolor=colors.BG_PRIMARY,
                     font=dict(color=colors.TEXT_PRIMARY),
                     xaxis_title="Day",
-                    yaxis_title="APY (%)",
+                    yaxis_title="Protocol APY (%)",
                     hovermode='x unified',
                     height=300
                 )
