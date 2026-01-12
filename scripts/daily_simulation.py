@@ -129,10 +129,16 @@ def run_conservative_simulation(
     )
 
     # Equal allocation across protocols
-    allocation_per_protocol = initial_capital / len(market_data)
+    # Account for gas fees: $15 per deposit transaction
+    gas_fee_per_deposit = Decimal('15.00')
+    total_gas_fees = gas_fee_per_deposit * len(market_data)
+    capital_after_gas = initial_capital - total_gas_fees
+    allocation_per_protocol = capital_after_gas / len(market_data)
 
     print_section("Opening Positions")
     print(f"Diversifying ${initial_capital:,.0f} across {len(market_data)} protocol(s)")
+    print(f"Total gas fees: ${total_gas_fees:,.0f} ({len(market_data)} × ${gas_fee_per_deposit})")
+    print(f"Capital after gas: ${capital_after_gas:,.0f}")
     print(f"Allocation per protocol: ${allocation_per_protocol:,.0f}\n")
 
     for protocol, data in market_data.items():
