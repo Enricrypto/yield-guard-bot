@@ -8,10 +8,10 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from database.db import DatabaseManager
-from market_data.historical_fetcher import HistoricalDataFetcher
+from src.database.db import DatabaseManager
+from src.market_data.historical_fetcher import HistoricalDataFetcher
 from datetime import datetime
 
 

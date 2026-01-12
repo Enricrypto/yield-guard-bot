@@ -3,9 +3,9 @@ import streamlit as st
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-from styles.color_palette import FintechColorPalette as colors
-from styles.custom_css import get_custom_css
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.styles.color_palette import FintechColorPalette as colors
+from src.styles.custom_css import get_custom_css
 
 st.set_page_config(page_title="Render Test", layout="wide")
 

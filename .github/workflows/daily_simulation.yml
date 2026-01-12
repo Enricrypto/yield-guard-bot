@@ -12,11 +12,11 @@ jobs:
     steps:
       # 1️⃣ Checkout code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2️⃣ Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -35,9 +35,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-      # 5️⃣ Verify installed packages (optional)
-      - name: Verify installed packages
-        run: pip list
+      # 5️⃣ Run tests ✅
+      - name: Run tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest tests/ -v --tb=short
 
       # 6️⃣ Create data directory
       - name: Create data directory
@@ -79,7 +81,7 @@ jobs:
 
       # 11️⃣ Upload simulation results
       - name: Upload simulation results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: simulation-results-${{ github.run_number }}
@@ -101,7 +103,7 @@ jobs:
           cat simulation_summary.txt >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
-      # 13️⃣ Check for significant losses (uses separate Python script)
+      # 13️⃣ Check for significant losses
       - name: Check for significant losses
         if: always()
         run: python scripts/check_loss.py

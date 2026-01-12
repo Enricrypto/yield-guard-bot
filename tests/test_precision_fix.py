@@ -9,9 +9,9 @@ from pathlib import Path
 from decimal import Decimal
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from simulator.treasury_simulator import TreasurySimulator
+from src.simulator.treasury_simulator import TreasurySimulator
 
 
 def test_capital_allocation():
