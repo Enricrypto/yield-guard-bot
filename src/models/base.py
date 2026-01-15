@@ -9,10 +9,13 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
+# Default to SQLite database in data directory if DATABASE_URL not set
 DATABASE_URL = os.getenv("DATABASE_URL")
-
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+    # Use SQLite by default for local development and testing
+    data_dir = Path(__file__).parent.parent.parent / 'data'
+    data_dir.mkdir(exist_ok=True)
+    DATABASE_URL = f"sqlite:///{data_dir / 'simulations.db'}"
 
 engine = create_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
