@@ -86,7 +86,7 @@ def test_strategy_insert():
         return None
 
 
-def test_simulation_insert(strategy_id):
+def test_simulation_insert():
     """Test inserting a SimulationRun record"""
     print("\n" + "=" * 60)
     print("4. Testing SimulationRun Insert")
@@ -95,9 +95,22 @@ def test_simulation_insert(strategy_id):
     try:
         db = SessionLocal()
 
+        # First create a strategy
+        strategy = StrategyConfig(
+            name="Test Strategy",
+            description="Test strategy for simulation",
+            initial_capital=10000.0,
+            leverage_ratio=1.0,
+            min_health_factor=1.5,
+            protocols=["aave-v3"]
+        )
+        db.add(strategy)
+        db.commit()
+        db.refresh(strategy)
+
         # Create a test simulation
         simulation = SimulationRun(
-            strategy_id=strategy_id,
+            strategy_id=strategy.id,
             start_date=datetime(2024, 1, 1),
             end_date=datetime(2024, 12, 31),
             initial_capital=10000.0,
@@ -132,7 +145,7 @@ def test_simulation_insert(strategy_id):
         return None
 
 
-def test_portfolio_history_insert(simulation_id):
+def test_portfolio_history_insert():
     """Test inserting PortfolioHistory records"""
     print("\n" + "=" * 60)
     print("5. Testing PortfolioHistory Insert")
@@ -140,6 +153,42 @@ def test_portfolio_history_insert(simulation_id):
 
     try:
         db = SessionLocal()
+
+        # First create a strategy and simulation
+        strategy = StrategyConfig(
+            name="Test Strategy",
+            description="Test strategy for portfolio history",
+            initial_capital=10000.0,
+            leverage_ratio=1.0,
+            min_health_factor=1.5,
+            protocols=["aave-v3"]
+        )
+        db.add(strategy)
+        db.commit()
+        db.refresh(strategy)
+
+        simulation = SimulationRun(
+            strategy_id=strategy.id,
+            start_date=datetime(2024, 1, 1),
+            end_date=datetime(2024, 1, 5),
+            initial_capital=10000.0,
+            final_value=10200.0,
+            total_return=2.0,
+            total_return_amount=200.0,
+            max_drawdown=1.0,
+            sharpe_ratio=1.5,
+            volatility=2.0,
+            win_rate=60.0,
+            avg_daily_return=0.04,
+            best_day=1.5,
+            worst_day=-0.5,
+            status="completed",
+            execution_time=30.0
+        )
+        db.add(simulation)
+        db.commit()
+        db.refresh(simulation)
+        simulation_id = simulation.id
 
         # Create 5 days of portfolio history
         start_date = datetime(2024, 1, 1)

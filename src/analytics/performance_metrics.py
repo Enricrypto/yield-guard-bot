@@ -201,10 +201,8 @@ class PerformanceMetrics:
         # Calculate volatility
         volatility = self.calculate_volatility(returns, annualize=False)
 
-        # Minimum volatility threshold to prevent division by near-zero
-        # If volatility is too low, the Sharpe ratio becomes meaningless
-        min_volatility = Decimal('0.0001')  # 0.01% minimum daily volatility
-        if volatility < min_volatility:
+        # If volatility is exactly zero, Sharpe ratio is undefined
+        if volatility == Decimal('0'):
             return Decimal('0')
 
         # Daily risk-free rate
